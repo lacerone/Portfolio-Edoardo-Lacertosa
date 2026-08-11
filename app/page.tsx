@@ -2,221 +2,173 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Maximize2, X, Sliders, Info } from 'lucide-react';
-
-interface ExifData {
-  camera?: string;
-  lens?: string;
-  iso?: string;
-  aperture?: string;
-  shutter?: string;
-  focal_length?: string;
-}
+import ExifReader from 'exifreader';
+import { Upload, Trash2, RefreshCw, Image as ImageIcon } from 'lucide-react';
 
 interface Photo {
   id: string;
   public_url: string;
   title: string;
   rotation: number;
-  exif_data?: ExifData;
-  created_at: string;
+  storage_path: string;
+  exif_data: Record<string, unknown>;
 }
 
-export default function Home() {
+export default function AdminDashboard() {
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
-  const [showExifInfo, setShowExifInfo] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState('');
+  const supabase = createClient();
 
   useEffect(() => {
-    const fetchPhotos = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('photos')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setPhotos(data);
-      }
-      setLoading(false);
-    };
-
     fetchPhotos();
   }, []);
 
-  return (
-    <main className="min-h-screen bg-[#0A0A0A] text-[#E5E5E5] selection:bg-neutral-800 selection:text-white flex flex-col justify-between overflow-x-hidden">
-      
-      {/* Header Stile Editoriale Indie */}
-      <header className="fixed top-0 left-0 right-0 z-40 p-6 md:p-10 flex justify-between items-start pointer-events-none mix-blend-difference">
-        <div className="pointer-events-auto">
-          <h1 className="text-2xl md:text-4xl font-serif tracking-tight font-light">
-            EDOARDO LACERTOSA
-          </h1>
-          <p className="text-xs font-mono uppercase tracking-widest text-neutral-400 mt-1">
-            Visual Archive & Works
-          </p>
-        </div>
+  const fetchPhotos = async () => {
+    const { data, error } = await supabase
+      .from('photos')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-        <nav className="pointer-events-auto flex items-center gap-6 text-xs font-mono">
-          <a
-            href="/admin"
-            className="px-3 py-1.5 rounded-full border border-neutral-700 bg-neutral-900/60 backdrop-blur-md hover:bg-white hover:text-black transition-all"
-          >
-            STUDIO ADMIN
-          </a>
-        </nav>
+    if (!error && data) {
+      setPhotos(data as Photo[]);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    setStatus('Parsing EXIF & Caricamento...');
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const tags = ExifReader.load(arrayBuffer);
+
+        const exifData = {
+          camera: tags?.Model?.description || tags?.Make?.description || 'Unknown Camera',
+          lens: tags?.LensModel?.description || 'Standard Lens',
+          iso: tags?.ISOSpeedRatings?.description || tags?.PhotographicSensitivity?.description || 'ISO --',
+          aperture: tags?.FNumber?.description || '',
+          shutter: tags?.ExposureTime?.description || '',
+          focal_length: tags?.FocalLength?.description || '',
+        };
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `uploads/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('portfolio-images')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('portfolio-images')
+          .getPublicUrl(filePath);
+
+        const randomRotation = Number((Math.random() * 8 - 4).toFixed(1));
+
+        await supabase.from('photos').insert({
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          storage_path: filePath,
+          public_url: publicUrlData.publicUrl,
+          rotation: randomRotation,
+          exif_data: exifData,
+        });
+
+      } catch (err: unknown) {
+        console.error('Errore durante upload:', err);
+      }
+    }
+
+    setStatus('Caricamento completato!');
+    setUploading(false);
+    fetchPhotos();
+  };
+
+  const handleDelete = async (id: string, storagePath: string) => {
+    if (!confirm('Vuoi davvero eliminare questa foto?')) return;
+
+    await supabase.storage.from('portfolio-images').remove([storagePath]);
+    await supabase.from('photos').delete().eq('id', id);
+    fetchPhotos();
+  };
+
+  return (
+    <main className="min-h-screen bg-[#0D0D0D] text-neutral-100 p-4 md:p-8 max-w-4xl mx-auto">
+      <header className="flex justify-between items-center border-b border-neutral-800 pb-4 mb-6">
+        <div>
+          <h1 className="text-xl font-serif font-bold">Mobile Studio Admin</h1>
+          <p className="text-xs font-mono text-neutral-400">Gestione Scatti & Portfolio</p>
+        </div>
+        <button
+          onClick={fetchPhotos}
+          className="p-2 bg-neutral-900 border border-neutral-800 rounded-lg text-neutral-300 hover:text-white"
+        >
+          <RefreshCw size={18} />
+        </button>
       </header>
 
-      {/* Hero / Intro Text */}
-      <div className="pt-32 px-6 md:px-12 max-w-xl">
-        <p className="text-xs md:text-sm font-mono text-neutral-400 leading-relaxed">
-          [ Drag cards to explore • Tap for full specs ]
-        </p>
-      </div>
-
-      {/* Main Interactive Stage (Canvas Orizzontale estilo Lebon + Garreta) */}
-      <section className="relative my-auto py-12 px-6 md:px-12 overflow-x-auto no-scrollbar flex items-center gap-8 md:gap-16 min-h-[60vh] snap-x">
-        {loading ? (
-          <div className="w-full flex justify-center items-center py-24 font-mono text-xs text-neutral-500">
-            [ Loading Archive... ]
-          </div>
-        ) : photos.length === 0 ? (
-          <div className="w-full text-center py-24 font-mono text-xs text-neutral-500">
-            Nessuno scatto presente nell'archivio. Accedi a <a href="/admin" className="underline text-neutral-300">/admin</a> dal telefono per caricare le tue prime foto.
-          </div>
-        ) : (
-          photos.map((photo, idx) => (
-            <motion.div
-              key={photo.id}
-              drag
-              dragConstraints={{ top: -40, left: -40, right: 40, bottom: 40 }}
-              whileDrag={{ scale: 1.05, zIndex: 50 }}
-              whileHover={{ scale: 1.02 }}
-              initial={{ rotate: photo.rotation || 0, opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: idx * 0.08 }}
-              onClick={() => setSelectedPhoto(photo)}
-              className="relative flex-shrink-0 cursor-grab active:cursor-grabbing select-none snap-center group"
-            >
-              {/* Photo Frame / Card Stile Polaroid / Contact Sheet */}
-              <div className="bg-neutral-900/90 border border-neutral-800/80 p-3 md:p-4 rounded-sm shadow-2xl backdrop-blur-sm max-w-[280px] sm:max-w-[340px] md:max-w-[380px] transition-colors group-hover:border-neutral-600">
-                <div className="relative aspect-[4/5] overflow-hidden bg-neutral-950 rounded-xs">
-                  <img
-                    src={photo.public_url}
-                    alt={photo.title || 'Photograph'}
-                    className="w-full h-full object-cover pointer-events-none"
-                    loading="lazy"
-                  />
-                  <div className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Maximize2 size={14} />
-                  </div>
-                </div>
-
-                {/* EXIF Metadata Footer */}
-                {photo.exif_data && (
-                  <div className="mt-3 pt-2 border-t border-neutral-800/60 flex justify-between items-center text-[10px] font-mono text-neutral-400">
-                    <span className="truncate max-w-[150px]">{photo.exif_data.camera || 'Analog / Digital'}</span>
-                    <span>{photo.exif_data.focal_length} {photo.exif_data.aperture}</span>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          ))
-        )}
+      <section className="mb-8">
+        <label className="border-2 border-dashed border-neutral-800 hover:border-neutral-600 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer bg-neutral-900/40 transition-colors">
+          <Upload size={32} className="text-neutral-400 mb-2" />
+          <span className="text-sm font-medium">Seleziona foto dal rullino</span>
+          <span className="text-xs text-neutral-500 font-mono mt-1">Caricamento multiplo</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileUpload}
+            disabled={uploading}
+            className="hidden"
+          />
+        </label>
+        {status && <p className="mt-2 text-xs font-mono text-center text-neutral-400">{status}</p>}
       </section>
 
-      {/* Lightbox / Modal a Schermo Intero per Dettaglio & EXIF */}
-      <AnimatePresence>
-        {selectedPhoto && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedPhoto(null)}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-10"
-          >
-            <button
-              onClick={() => setSelectedPhoto(null)}
-              className="absolute top-6 right-6 z-50 p-3 bg-neutral-900 rounded-full border border-neutral-800 text-neutral-300 hover:text-white"
-            >
-              <X size={20} />
-            </button>
+      <section>
+        <h2 className="text-sm font-mono uppercase tracking-wider text-neutral-400 mb-4 flex items-center gap-2">
+          <ImageIcon size={16} /> Foto Caricate ({photos.length})
+        </h2>
 
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {photos.map((photo) => (
             <div
-              onClick={(e) => e.stopPropagation()}
-              className="relative max-w-6xl w-full max-h-[90vh] flex flex-col md:flex-row items-center gap-6 justify-center"
+              key={photo.id}
+              className="bg-neutral-900 border border-neutral-800 p-2 rounded-lg relative group overflow-hidden"
             >
-              {/* Immagine ad alta risoluzione */}
-              <div className="relative flex-1 max-h-[75vh] md:max-h-[85vh] flex justify-center items-center">
+              <div className="aspect-square relative overflow-hidden rounded bg-neutral-950">
                 <img
-                  src={selectedPhoto.public_url}
-                  alt={selectedPhoto.title}
-                  className="max-h-[75vh] md:max-h-[85vh] w-auto max-w-full object-contain rounded-xs shadow-2xl"
+                  src={photo.public_url}
+                  alt={photo.title}
+                  className="w-full h-full object-cover"
                 />
               </div>
 
-              {/* Scheda Dettagli EXIF Laterale */}
-              <div className="w-full md:w-80 bg-neutral-900/80 border border-neutral-800 p-6 rounded-lg font-mono text-xs text-neutral-300 backdrop-blur-md">
-                <div className="flex justify-between items-center mb-4 pb-2 border-b border-neutral-800">
-                  <span className="uppercase tracking-widest text-[10px] text-neutral-500 flex items-center gap-1.5">
-                    <Info size={12} /> Camera Specs
-                  </span>
-                  <button
-                    onClick={() => setShowExifInfo(!showExifInfo)}
-                    className="text-neutral-500 hover:text-neutral-300"
-                  >
-                    <Sliders size={14} />
-                  </button>
-                </div>
-
-                <h3 className="text-sm font-serif font-bold text-white mb-4 truncate">
-                  {selectedPhoto.title}
-                </h3>
-
-                {selectedPhoto.exif_data && (
-                  <dl className="space-y-2.5 text-[11px]">
-                    <div className="flex justify-between">
-                      <dt className="text-neutral-500">Body</dt>
-                      <dd className="text-neutral-200">{selectedPhoto.exif_data.camera || 'N/A'}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-neutral-500">Lens</dt>
-                      <dd className="text-neutral-200">{selectedPhoto.exif_data.lens || 'N/A'}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-neutral-500">Focal Length</dt>
-                      <dd className="text-neutral-200">{selectedPhoto.exif_data.focal_length || 'N/A'}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-neutral-500">Aperture</dt>
-                      <dd className="text-neutral-200">{selectedPhoto.exif_data.aperture || 'N/A'}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-neutral-500">Shutter Speed</dt>
-                      <dd className="text-neutral-200">{selectedPhoto.exif_data.shutter || 'N/A'}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-neutral-500">ISO</dt>
-                      <dd className="text-neutral-200">{selectedPhoto.exif_data.iso || 'N/A'}</dd>
-                    </div>
-                  </dl>
-                )}
+              <div className="mt-2 text-[10px] font-mono text-neutral-400 truncate">
+                {photo.title}
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Footer Minimal */}
-      <footer className="p-6 md:p-10 border-t border-neutral-900 flex justify-between items-center text-[10px] font-mono text-neutral-500">
-        <span>© {new Date().getFullYear()} Edoardo Lacertosa</span>
-        <span className="flex items-center gap-1.5">
-          <Camera size={12} /> Powered by Supabase & Vercel
-        </span>
-      </footer>
+              <div className="mt-1 text-[9px] font-mono text-neutral-500 flex justify-between">
+                <span>Rotazione: {photo.rotation} deg</span>
+              </div>
+
+              <button
+                onClick={() => handleDelete(photo.id, photo.storage_path)}
+                className="absolute top-3 right-3 p-1.5 bg-red-950/80 text-red-400 rounded-md border border-red-800/50 hover:bg-red-900 transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
