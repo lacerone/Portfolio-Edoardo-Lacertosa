@@ -32,7 +32,7 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
 
   const textInit = "EDOARDO LACERTOSA";
-  const textHold = "EMAIL   INSTAGRAM   PORTFOLIO";
+  const textHold = "INFO   INSTA   PORTFOLIO";
 
   const [typedInit, setTypedInit] = useState("");
   const [typedHold, setTypedHold] = useState("");
@@ -161,7 +161,7 @@ export default function Home() {
   return (
     <main className="h-[100dvh] w-screen bg-white text-black overflow-hidden relative select-none">
       
-      {/* Font e Layer CSS Dinamici per Mobile */}
+      {/* Font e Layer CSS Dinamici */}
       <style>{`
         @font-face {
           font-family: "FRANK LEBON Front";
@@ -185,7 +185,7 @@ export default function Home() {
         }
 
         .lebon-container {
-          font-size: 0.925vw;
+          font-size: 1.4vw;
           letter-spacing: 0.05em;
           word-spacing: 1.5em;
           text-transform: uppercase;
@@ -193,10 +193,10 @@ export default function Home() {
         }
 
         @media screen and (max-width: 1024px) {
-          .lebon-container { font-size: 2.25vw; }
+          .lebon-container { font-size: 3.2vw; word-spacing: 1.2em; }
         }
         @media screen and (max-width: 568px) {
-          .lebon-container { font-size: 3vw; word-spacing: 1em; }
+          .lebon-container { font-size: 4.2vw; word-spacing: 0.8em; }
         }
 
         /* BACK LAYER */
@@ -222,9 +222,9 @@ export default function Home() {
         }
       `}</style>
 
-      {/* LAYER 1 (BACK LAYER) - Ancorato con 100dvh */}
+      {/* LAYER 1 (BACK LAYER) */}
       <div className="fixed inset-0 h-[100dvh] w-screen z-20 flex items-center justify-center text-center pointer-events-none lebon-container layer-back">
-        <div className="w-full px-8">
+        <div className="w-full px-4 sm:px-8">
           {isMounted && stage === 'init' && (
             <span>{typedInit || " "}</span>
           )}
@@ -232,16 +232,16 @@ export default function Home() {
           {isMounted && (stage === 'hold' || stage === 'active') && (
             <span>
               <a className={hoveredIndex === 0 ? 'swap' : ''}>
-                {typedHold.slice(0, 5)}
+                {typedHold.slice(0, 4)}
               </a>
-              {typedHold.length > 5 && (
-                <a className={`ml-[1.5em] ${hoveredIndex === 1 ? 'swap' : ''}`}>
-                  {typedHold.slice(8, 17)}
+              {typedHold.length > 4 && (
+                <a className={`ml-[1.2em] sm:ml-[1.5em] ${hoveredIndex === 1 ? 'swap' : ''}`}>
+                  {typedHold.slice(7, 12)}
                 </a>
               )}
-              {typedHold.length > 17 && (
-                <a className={`ml-[1.5em] ${hoveredIndex === 2 ? 'swap' : ''}`}>
-                  {typedHold.slice(20)}
+              {typedHold.length > 12 && (
+                <a className={`ml-[1.2em] sm:ml-[1.5em] ${hoveredIndex === 2 ? 'swap' : ''}`}>
+                  {typedHold.slice(15)}
                 </a>
               )}
             </span>
@@ -249,9 +249,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* LAYER 2 (FRONT LAYER) - Ancorato con 100dvh */}
+      {/* LAYER 2 (FRONT LAYER) */}
       <div className="fixed inset-0 h-[100dvh] w-screen z-30 flex items-center justify-center text-center pointer-events-none lebon-container layer-front">
-        <div className="w-full px-8">
+        <div className="w-full px-4 sm:px-8">
           {isMounted && stage === 'init' && (
             <span>{typedInit || " "}</span>
           )}
@@ -264,28 +264,28 @@ export default function Home() {
                 onMouseEnter={() => setHoveredIndex(0)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                {typedHold.slice(0, 5)}
+                {typedHold.slice(0, 4)}
               </a>
-              {typedHold.length > 5 && (
+              {typedHold.length > 4 && (
                 <a 
                   href="https://www.instagram.com/edoardo_lacertosa/" 
                   target="_blank" 
                   rel="noreferrer" 
-                  className={`ml-[1.5em] ${hoveredIndex === 1 ? 'swap' : ''}`}
+                  className={`ml-[1.2em] sm:ml-[1.5em] ${hoveredIndex === 1 ? 'swap' : ''}`}
                   onMouseEnter={() => setHoveredIndex(1)}
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  {typedHold.slice(8, 17)}
+                  {typedHold.slice(7, 12)}
                 </a>
               )}
-              {typedHold.length > 17 && (
+              {typedHold.length > 12 && (
                 <a 
                   href="/port" 
-                  className={`ml-[1.5em] ${hoveredIndex === 2 ? 'swap' : ''}`}
+                  className={`ml-[1.2em] sm:ml-[1.5em] ${hoveredIndex === 2 ? 'swap' : ''}`}
                   onMouseEnter={() => setHoveredIndex(2)}
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  {typedHold.slice(20)}
+                  {typedHold.slice(15)}
                 </a>
               )}
             </span>
@@ -293,7 +293,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* STAGE GALLERIA FOTO - Ancoraggio Dynamic Viewport */}
+      {/* STAGE GALLERIA FOTO */}
       <div 
         className="absolute inset-[0.5rem] flex items-center justify-center pointer-events-none z-10 bg-white"
         style={{ height: 'calc(100dvh - 1rem)', width: 'calc(100vw - 1rem)' }}
