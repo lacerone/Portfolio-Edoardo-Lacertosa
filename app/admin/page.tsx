@@ -19,7 +19,7 @@ interface Photo {
   group_id?: string;
   collection?: string;
   created_at: string;
-  is_cover?: boolean; // Campo Copertina
+  is_cover?: boolean;
 }
 
 const supabase = createClient();
@@ -46,10 +46,11 @@ export default function AdminPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   const [title, setTitle] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
@@ -141,13 +142,11 @@ export default function AdminPage() {
     }
 
     try {
-      // 1. Disattiva la copertina precedente per TUTTE le foto del gruppo
       await supabase
         .from('photos')
         .update({ is_cover: false })
         .eq('group_id', photo.group_id);
 
-      // 2. Imposta come copertina solo la foto selezionata
       const { error } = await supabase
         .from('photos')
         .update({ is_cover: true })
@@ -155,7 +154,6 @@ export default function AdminPage() {
 
       if (error) throw error;
 
-      // Aggiorna lo stato locale
       setPhotos((prev) =>
         prev.map((p) => {
           if (p.group_id === photo.group_id) {
@@ -202,62 +200,71 @@ export default function AdminPage() {
     }
   };
 
+  // CARICAMENTO MULTIPLO FOTO
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) return alert('Seleziona una foto!');
+    if (selectedFiles.length === 0) return alert('Seleziona almeno una foto!');
 
     setUploading(true);
+    const targetGroup = groups.find((g) => g.id === selectedGroupId);
+    const uploadedPhotos: Photo[] = [];
 
     try {
-      const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
-      const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setUploadProgress(`CARICAMENTO ${i + 1} DI ${selectedFiles.length}...`);
 
-      const { error: uploadError } = await supabase.storage
-        .from('portfolio-images')
-        .upload(cleanFileName, selectedFile, {
-          cacheControl: '3600',
-          upsert: true,
-        });
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from('portfolio-images')
+          .upload(cleanFileName, file, {
+            cacheControl: '3600',
+            upsert: true,
+          });
 
-      const { data: urlData } = supabase.storage
-        .from('portfolio-images')
-        .getPublicUrl(cleanFileName);
+        if (uploadError) throw uploadError;
 
-      const targetGroup = groups.find((g) => g.id === selectedGroupId);
-      const defaultTitle = selectedFile.name.substring(0, selectedFile.name.lastIndexOf('.')) || selectedFile.name;
-      const finalTitle = title.trim() ? title.trim() : defaultTitle;
+        const { data: urlData } = supabase.storage
+          .from('portfolio-images')
+          .getPublicUrl(cleanFileName);
 
-      const { data: newPhoto, error: dbError } = await supabase
-        .from('photos')
-        .insert([
-          {
-            public_url: urlData.publicUrl,
-            storage_path: cleanFileName,
-            title: finalTitle,
-            group_id: selectedGroupId || null,
-            collection: targetGroup ? targetGroup.name : 'General',
-            is_cover: false,
-          },
-        ])
-        .select()
-        .single();
+        const defaultTitle = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+        let finalTitle = title.trim() ? title.trim() : defaultTitle;
+        if (title.trim() && selectedFiles.length > 1) {
+          finalTitle = `${title.trim()}_${i + 1}`;
+        }
 
-      if (dbError) throw dbError;
+        const { data: newPhoto, error: dbError } = await supabase
+          .from('photos')
+          .insert([
+            {
+              public_url: urlData.publicUrl,
+              storage_path: cleanFileName,
+              title: finalTitle,
+              group_id: selectedGroupId || null,
+              collection: targetGroup ? targetGroup.name : 'General',
+              is_cover: false,
+            },
+          ])
+          .select()
+          .single();
 
-      setTitle('');
-      setSelectedFile(null);
-      
-      if (newPhoto) {
-        setPhotos((prev) => [newPhoto as Photo, ...prev]);
+        if (dbError) throw dbError;
+        if (newPhoto) uploadedPhotos.push(newPhoto as Photo);
       }
 
-      alert('Foto caricata!');
+      setTitle('');
+      setSelectedFiles([]);
+      setPhotos((prev) => [...uploadedPhotos.reverse(), ...prev]);
+
+      alert(`${uploadedPhotos.length} ${uploadedPhotos.length === 1 ? 'foto caricata' : 'foto caricate'} con successo!`);
     } catch (err: any) {
       alert('Errore caricamento: ' + err.message);
     } finally {
       setUploading(false);
+      setUploadProgress('');
     }
   };
 
@@ -269,7 +276,7 @@ export default function AdminPage() {
       .update({
         group_id: newGroupId || null,
         collection: targetGroup ? targetGroup.name : 'General',
-        is_cover: false, // resetta copertina se spostata di gruppo
+        is_cover: false,
       })
       .eq('id', photoId);
 
@@ -416,16 +423,19 @@ export default function AdminPage() {
 
           <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-sm">
             <h2 className="text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2 text-white">
-              <Upload size={14} /> Carica Nuova Foto
+              <Upload size={14} /> Carica Foto (Singola o Multipla)
             </h2>
             <form onSubmit={handleUpload} className="space-y-3">
               <div>
-                <label className="block text-neutral-400 mb-1 uppercase">Seleziona Immagine</label>
+                <label className="block text-neutral-400 mb-1 uppercase">
+                  Seleziona Immagini {selectedFiles.length > 0 && `(${selectedFiles.length} selezionate)`}
+                </label>
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                  className="w-full text-neutral-400 bg-neutral-950 border border-neutral-800 p-2 rounded-xs cursor-pointer"
+                  multiple
+                  onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
+                  className="w-full text-neutral-400 bg-neutral-950 border border-neutral-800 p-2 rounded-xs cursor-pointer text-[10px]"
                 />
               </div>
 
@@ -446,10 +456,10 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="block text-neutral-400 mb-1 uppercase">Titolo Foto</label>
+                <label className="block text-neutral-400 mb-1 uppercase">Prefisso / Titolo Foto</label>
                 <input
                   type="text"
-                  placeholder="es. LOOK_01"
+                  placeholder="es. LOOK (lascia vuoto per nome originale)"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full bg-neutral-950 border border-neutral-800 p-2 text-white rounded-xs focus:outline-none"
@@ -459,9 +469,16 @@ export default function AdminPage() {
               <button
                 type="submit"
                 disabled={uploading}
-                className="w-full bg-white text-black font-bold p-3 uppercase hover:bg-neutral-200 transition-colors disabled:opacity-50 cursor-pointer"
+                className="w-full bg-white text-black font-bold p-3 uppercase hover:bg-neutral-200 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
               >
-                {uploading ? 'CARICAMENTO...' : 'CARICA NELL ARCHIVIO'}
+                {uploading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={14} />
+                    {uploadProgress || 'CARICAMENTO...'}
+                  </>
+                ) : (
+                  `CARICA ${selectedFiles.length > 1 ? `${selectedFiles.length} FOTO` : 'FOTO'}`
+                )}
               </button>
             </form>
           </div>
@@ -535,7 +552,6 @@ export default function AdminPage() {
                         className="w-full h-full object-contain p-2"
                       />
 
-                      {/* BADGE COPERTINA */}
                       {photo.is_cover && (
                         <div className="absolute top-2 left-2 bg-emerald-500 text-black font-bold text-[9px] px-2 py-0.5 uppercase tracking-widest flex items-center gap-1 shadow-md">
                           <Star size={10} className="fill-black" /> COPERTINA
@@ -557,7 +573,6 @@ export default function AdminPage() {
                         </button>
                       </div>
 
-                      {/* PULSANTE SET COPERTINA */}
                       {photo.group_id && (
                         <button
                           onClick={() => handleSetCover(photo)}
