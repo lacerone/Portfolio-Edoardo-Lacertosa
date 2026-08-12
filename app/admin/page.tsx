@@ -1,6 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic'; // <--- AGGIUNGI QUESTA RIGA
+import dynamic from 'next/dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';

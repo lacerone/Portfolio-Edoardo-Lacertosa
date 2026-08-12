@@ -1,6 +1,6 @@
-// lib/supabase.ts
 import { createBrowserClient } from '@supabase/ssr';
-// Se usavi @supabase/supabase-js: import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+// Nota: Se nel tuo progetto non usi @supabase/ssr ma @supabase/supabase-js, sostituisci con:
+// import { createClient as createBrowserClient } from '@supabase/supabase-js';
 
 export const createClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
