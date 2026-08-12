@@ -3,9 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Sliders } from 'lucide-react';
 import Link from 'next/link';
-import TitansGallery from './component/TitansGallery';
 
 interface ExifData {
   camera?: string;
@@ -33,12 +32,9 @@ interface Photo {
   is_cover?: boolean;
 }
 
-const GAP = 0;
-const TARGET_ROW_HEIGHT = 280;
-
 const supabase = createClient();
 
-function getOptimizedUrl(originalUrl: string, width: number = 1200) {
+function getOptimizedUrl(originalUrl: string, width: number = 1000) {
   if (!originalUrl) return '';
   if (originalUrl.includes('/storage/v1/object/public/')) {
     return originalUrl.replace(
@@ -61,6 +57,135 @@ function shuffleArray<T>(array: T[]): T[] {
 function isTouchDevice() {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(hover: none)').matches || 'ontouchstart' in window;
+}
+
+function useIntersectionObserver(
+  ref: React.RefObject<HTMLElement | null>,
+  options: IntersectionObserverInit = { threshold: 0.05 }
+) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setIsVisible(true);
+        observer.disconnect();
+      }
+    }, options);
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => observer.disconnect();
+  }, [ref, options]);
+
+  return isVisible;
+}
+
+const GalleryImage = ({
+  photo,
+  groupName,
+  onSelect,
+}: {
+  photo: Photo;
+  groupName: string;
+  onSelect: (photo: Photo) => void;
+}) => {
+  const imgRef = useRef<HTMLDivElement>(null);
+  const isVisible = useIntersectionObserver(imgRef, { threshold: 0.05 });
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <motion.div
+      ref={imgRef}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: isVisible ? 1 : 0 }}
+      transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
+      className="relative overflow-hidden bg-white cursor-pointer group w-full flex justify-center px-4"
+      onClick={() => onSelect(photo)}
+    >
+      {isVisible && (
+        <img
+          src={getOptimizedUrl(photo.public_url, 1000)}
+          alt={photo.title || groupName}
+          className="w-full max-w-2xl h-auto object-contain mx-auto block transition-transform duration-700 ease-out group-hover:scale-102"
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+        />
+      )}
+      {!loaded && isVisible && (
+        <div className="absolute inset-0 bg-neutral-100 animate-pulse max-w-2xl mx-auto" />
+      )}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+    </motion.div>
+  );
+};
+
+function StandardGalleryView({
+  group,
+  photos,
+  onBack,
+  onSelectPhoto,
+}: {
+  group: Group;
+  photos: Photo[];
+  onBack: () => void;
+  onSelectPhoto: (photo: Photo) => void;
+}) {
+  const col1: Photo[] = [];
+  const col2: Photo[] = [];
+  photos.forEach((photo, i) => {
+    if (i % 2 === 0) col1.push(photo);
+    else col2.push(photo);
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+      className="fixed inset-0 z-50 w-screen h-screen bg-white text-black overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white m-0 p-0"
+    >
+      <header className="fixed top-5 left-5 z-50 bg-transparent">
+        <button
+          onClick={onBack}
+          title="Torna alla Home"
+          className="p-2.5 flex items-center justify-center group cursor-pointer"
+        >
+          <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm" />
+        </button>
+      </header>
+
+      <main className="w-screen max-w-none m-0 p-0 pt-48 pb-48 overflow-x-hidden flex flex-col items-center bg-white">
+        <div className="w-full max-w-6xl mx-auto px-4 border-t border-white pt-12 bg-white">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 justify-center bg-white">
+            <div className="flex flex-col items-center gap-12 md:gap-16 w-full">
+              {col1.map((photo) => (
+                <GalleryImage
+                  key={photo.id}
+                  photo={photo}
+                  groupName={group.name}
+                  onSelect={onSelectPhoto}
+                />
+              ))}
+            </div>
+            <div className="flex flex-col items-center gap-12 md:gap-16 w-full">
+              {col2.map((photo) => (
+                <GalleryImage
+                  key={photo.id}
+                  photo={photo}
+                  groupName={group.name}
+                  onSelect={onSelectPhoto}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
+    </motion.div>
+  );
 }
 
 function InteractiveReelRow({
@@ -211,28 +336,8 @@ export default function Portfolio() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
 
-  const [containerWidth, setContainerWidth] = useState<number>(0);
-  const [loadedRatios, setLoadedRatios] = useState<Record<string, number>>({});
-
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.clientWidth);
-      }
-    };
-    updateWidth();
-    const observer = new ResizeObserver(updateWidth);
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [loading, selectedGroup]);
-
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
-
       const [groupsRes, photosRes] = await Promise.all([
         supabase.from('groups').select('*').order('name', { ascending: true }),
         supabase.from('photos').select('*').order('created_at', { ascending: false })
@@ -254,55 +359,6 @@ export default function Portfolio() {
     if (!selectedGroup) return [];
     return photos.filter((p) => p.group_id === selectedGroup.id);
   }, [photos, selectedGroup]);
-
-  const handleImgLoad = (id: string) => (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    if (img.naturalWidth && img.naturalHeight) {
-      const ratio = img.naturalWidth / img.naturalHeight;
-      setLoadedRatios((prev) => {
-        if (prev[id] === ratio) return prev;
-        return { ...prev, [id]: ratio };
-      });
-    }
-  };
-
-  const layoutRows = useMemo(() => {
-    if (!containerWidth || currentProjectPhotos.length === 0) return [];
-
-    const rows: {
-      items: { photo: Photo; width: number; ratio: number }[];
-      height: number;
-    }[] = [];
-
-    let currentRow: { photo: Photo; ratio: number }[] = [];
-    let currentAspectSum = 0;
-
-    currentProjectPhotos.forEach((photo, index) => {
-      const ratio = loadedRatios[photo.id] || 1.333;
-      currentRow.push({ photo, ratio });
-      currentAspectSum += ratio;
-
-      const gapsTotalWidth = (currentRow.length - 1) * GAP;
-      const availableWidth = containerWidth - gapsTotalWidth;
-      const calculatedHeight = availableWidth / currentAspectSum;
-
-      if (calculatedHeight <= TARGET_ROW_HEIGHT || index === currentProjectPhotos.length - 1) {
-        const rowHeight = Math.max(calculatedHeight, 160);
-
-        const items = currentRow.map((item) => ({
-          photo: item.photo,
-          ratio: item.ratio,
-          width: item.ratio * rowHeight,
-        }));
-
-        rows.push({ items, height: rowHeight });
-        currentRow = [];
-        currentAspectSum = 0;
-      }
-    });
-
-    return rows;
-  }, [currentProjectPhotos, containerWidth, loadedRatios]);
 
   return (
     <main className="h-[100dvh] w-screen bg-white text-black m-0 p-0 font-sans select-none overflow-x-hidden relative">
@@ -338,7 +394,7 @@ export default function Portfolio() {
         }
       `}</style>
 
-      {/* Tasto home minimale */}
+      {/* TASTO HOME MINIMALE */}
       {!selectedGroup && (
         <Link
           href="/"
@@ -349,142 +405,50 @@ export default function Portfolio() {
         </Link>
       )}
 
-      {/* Contenitore principale con fade‑in globale all'arrivo dei dati */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: loading ? 0 : 1 }}
-        transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
-        className="h-full w-full"
-      >
-        {!loading && (
-          <AnimatePresence mode="wait">
-            {!selectedGroup ? (
-              <div key="index-reels" className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative bg-white m-0 p-0">
-                {/* Riga superiore con leggero ritardo */}
-                <motion.div
-                  initial={{ y: '-50dvh', opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '-50dvh', opacity: 0 }}
-                  transition={{
-                    duration: 0.7,
-                    ease: [0.76, 0, 0.24, 1],
-                    delay: 0.1,
-                  }}
-                  className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0"
-                >
-                  <InteractiveReelRow
-                    groups={shuffledGroupsRow1}
-                    photos={photos}
-                    direction={1}
-                    onSelectGroup={(g) => setSelectedGroup(g)}
-                  />
-                </motion.div>
+      <AnimatePresence mode="wait">
+        {!selectedGroup && (
+          <motion.div
+            key="index-reels"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative bg-white m-0 p-0"
+          >
+            {/* RIGA SUPERIORE: 50% DVH ESATTO */}
+            <div className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0">
+              <InteractiveReelRow
+                groups={shuffledGroupsRow1}
+                photos={photos}
+                direction={1}
+                onSelectGroup={(g) => setSelectedGroup(g)}
+              />
+            </div>
 
-                {/* Riga inferiore con ritardo maggiore */}
-                <motion.div
-                  initial={{ y: '50dvh', opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '50dvh', opacity: 0 }}
-                  transition={{
-                    duration: 0.7,
-                    ease: [0.76, 0, 0.24, 1],
-                    delay: 0.2,
-                  }}
-                  className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0"
-                >
-                  <InteractiveReelRow
-                    groups={shuffledGroupsRow2}
-                    photos={photos}
-                    direction={-1}
-                    onSelectGroup={(g) => setSelectedGroup(g)}
-                  />
-                </motion.div>
-              </div>
-            ) : (
-              // Progetto selezionato: se è "TITANS" usa il componente speciale, altrimenti la galleria standard
-              selectedGroup.name.toUpperCase() === 'TITANS' ? (
-                <TitansGallery
-                  group={selectedGroup}
-                  photos={currentProjectPhotos}
-                  onBack={() => setSelectedGroup(null)}
-                />
-              ) : (
-                <motion.div
-                  key="project-page"
-                  initial={{ y: '100dvh', opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '100dvh', opacity: 0 }}
-                  transition={{
-                    duration: 0.5,
-                    ease: [0.76, 0, 0.24, 1],
-                  }}
-                  className="fixed inset-0 z-50 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden bg-white text-black m-0 p-0"
-                >
-                  {/* Pulsante indietro (puntino) */}
-                  <header className="fixed top-5 left-5 z-50 bg-transparent">
-                    <button
-                      onClick={() => setSelectedGroup(null)}
-                      title="Torna indietro"
-                      className="p-2.5 flex items-center justify-center group cursor-pointer"
-                    >
-                      <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm" />
-                    </button>
-                  </header>
-
-                  <div ref={containerRef} className="w-screen max-w-none m-0 p-0 pt-16 flex flex-col items-center">
-                    {currentProjectPhotos.length === 0 ? (
-                      <div className="min-h-[50vh] flex items-center justify-center text-[10px] lebon-font text-neutral-400 uppercase tracking-widest">
-                        Nessuno scatto presente in questo progetto.
-                      </div>
-                    ) : (
-                      <div className="flex flex-col w-screen max-w-[1920px] mx-auto m-0 p-0 pb-12 items-center" style={{ gap: `0px` }}>
-                        {layoutRows.map((row, rowIndex) => (
-                          <div
-                            key={`row-${rowIndex}`}
-                            className="flex w-full justify-center overflow-hidden m-0 p-0"
-                            style={{ gap: `0px`, height: `${row.height}px` }}
-                          >
-                            {row.items.map(({ photo, ratio }) => {
-                              const thumbnailSrc = getOptimizedUrl(photo.public_url, 1200);
-                              return (
-                                <div
-                                  key={photo.id}
-                                  onClick={() => setSelectedPhoto(photo)}
-                                  style={{
-                                    flexGrow: ratio,
-                                    flexShrink: 1,
-                                    flexBasis: '0px',
-                                    height: `${row.height}px`,
-                                    margin: 0,
-                                    padding: 0,
-                                    border: 'none',
-                                  }}
-                                  className="relative group cursor-pointer overflow-hidden bg-white shadow-none hover:z-20 transition-all duration-300 border-0 outline-none m-0 p-0 flex justify-center items-center"
-                                >
-                                  <img
-                                    src={thumbnailSrc}
-                                    alt={photo.title || 'Scatto'}
-                                    className="w-full h-full block object-cover transition-transform duration-500 ease-out group-hover:scale-105 m-0 p-0 border-0 mx-auto"
-                                    loading="lazy"
-                                    decoding="async"
-                                    onLoad={handleImgLoad(photo.id)}
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )
-            )}
-          </AnimatePresence>
+            {/* RIGA INFERIORE: 50% DVH ESATTO */}
+            <div className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0">
+              <InteractiveReelRow
+                groups={shuffledGroupsRow2}
+                photos={photos}
+                direction={-1}
+                onSelectGroup={(g) => setSelectedGroup(g)}
+              />
+            </div>
+          </motion.div>
         )}
-      </motion.div>
 
-      {/* Modale EXIF */}
+        {/* RENDERING CONDIZIONALE DEL PROGETTO SELEZIONATO - TUTTE LE GALLERIE UGUALI */}
+        {selectedGroup && (
+          <StandardGalleryView
+            group={selectedGroup}
+            photos={currentProjectPhotos}
+            onBack={() => setSelectedGroup(null)}
+            onSelectPhoto={(photo) => setSelectedPhoto(photo)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* MODAL EXIF */}
       <AnimatePresence>
         {selectedPhoto && (
           <motion.div
