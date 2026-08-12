@@ -160,8 +160,8 @@ function InteractiveReelRow({
   };
 
   return (
-    <div className="w-full h-[50vh] relative overflow-hidden bg-black flex items-center">
-      <div ref={trackRef} className="flex h-full w-max shrink-0 will-change-transform">
+    <div className="w-full h-full relative overflow-hidden bg-black flex items-center">
+      <div ref={trackRef} className="flex h-full w-max shrink-0 items-center will-change-transform">
         {reelItems.map((group, idx) => {
           const itemKey = `reel-${group.id}-${idx}`;
 
@@ -175,13 +175,13 @@ function InteractiveReelRow({
             <div
               key={itemKey}
               onClick={() => handleCardClick(group, itemKey)}
-              className="relative h-[50vh] w-[70vw] sm:w-[45vw] md:w-[35vw] bg-neutral-900 shrink-0 group cursor-pointer overflow-hidden border-r border-black select-none"
+              className="relative h-full w-[70vw] sm:w-[45vw] md:w-[35vw] bg-neutral-900 shrink-0 group cursor-pointer overflow-hidden border-r border-black select-none flex items-center justify-center"
             >
               {cover && (
                 <img
                   src={getOptimizedUrl(cover.public_url, 1000)}
                   alt={group.name}
-                  className="w-full h-full object-cover block transition-transform duration-700 ease-out group-hover:scale-105"
+                  className="w-full h-full object-cover object-center block transition-transform duration-700 ease-out group-hover:scale-105"
                 />
               )}
 
@@ -304,7 +304,7 @@ export default function Portfolio() {
   }, [currentProjectPhotos, containerWidth, loadedRatios]);
 
   return (
-    <main className="h-screen w-screen bg-black text-white m-0 p-0 font-sans select-none overflow-hidden relative">
+    <main className="h-[100dvh] w-screen bg-black text-white m-0 p-0 font-sans select-none overflow-hidden relative">
       <style jsx global>{`
         @font-face {
           font-family: "FRANK LEBON Front";
@@ -321,12 +321,12 @@ export default function Portfolio() {
         ::-webkit-scrollbar { display: none; }
         html, body {
           scrollbar-width: none;
-          margin: 0; padding: 0; width: 100vw; height: 100vh;
+          margin: 0; padding: 0; width: 100vw; height: 100dvh;
           overflow: hidden; background: #000000;
         }
       `}</style>
 
-      {/* TASTO HOME: PICCOLISSIMO PALLINO ELEGANTE MINIMALE (ZERO TESTO) */}
+      {/* TASTO HOME MINIMALE */}
       {!selectedGroup && (
         <Link
           href="/"
@@ -344,12 +344,13 @@ export default function Portfolio() {
       ) : (
         <AnimatePresence mode="wait">
           {!selectedGroup && (
-            <div key="index-reels" className="h-screen w-screen flex flex-col justify-between overflow-hidden relative bg-black">
+            <div key="index-reels" className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative bg-black">
+              {/* RIGA SUPERIORE: 50% DVH ESATTO */}
               <motion.div
                 initial={{ y: 0, opacity: 1 }}
-                exit={{ y: '-50vh', opacity: 0 }}
+                exit={{ y: '-50dvh', opacity: 0 }}
                 transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
-                className="h-[50vh] w-full overflow-hidden"
+                className="h-[50dvh] flex-1 w-full overflow-hidden"
               >
                 <InteractiveReelRow
                   groups={shuffledGroupsRow1}
@@ -359,11 +360,12 @@ export default function Portfolio() {
                 />
               </motion.div>
 
+              {/* RIGA INFERIORE: 50% DVH ESATTO */}
               <motion.div
                 initial={{ y: 0, opacity: 1 }}
-                exit={{ y: '50vh', opacity: 0 }}
+                exit={{ y: '50dvh', opacity: 0 }}
                 transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
-                className="h-[50vh] w-full overflow-hidden"
+                className="h-[50dvh] flex-1 w-full overflow-hidden"
               >
                 <InteractiveReelRow
                   groups={shuffledGroupsRow2}
@@ -461,6 +463,7 @@ export default function Portfolio() {
         </AnimatePresence>
       )}
 
+      {/* MODAL EXIF */}
       <AnimatePresence>
         {selectedPhoto && (
           <motion.div

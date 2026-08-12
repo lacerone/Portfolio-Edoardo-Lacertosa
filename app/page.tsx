@@ -159,9 +159,9 @@ export default function Home() {
   const displayedUrl = currentPhoto ? getOptimizedUrl(currentPhoto.public_url, 1000) : null;
 
   return (
-    <main className="h-screen w-screen bg-white text-black overflow-hidden relative select-none">
+    <main className="h-[100dvh] w-screen bg-white text-black overflow-hidden relative select-none">
       
-      {/* Font e Layer CSS */}
+      {/* Font e Layer CSS Dinamici per Mobile */}
       <style>{`
         @font-face {
           font-family: "FRANK LEBON Front";
@@ -178,6 +178,12 @@ export default function Home() {
           font-display: block;
         }
 
+        html, body {
+          scrollbar-width: none;
+          margin: 0; padding: 0; width: 100vw; height: 100dvh;
+          overflow: hidden; background: #ffffff;
+        }
+
         .lebon-container {
           font-size: 0.925vw;
           letter-spacing: 0.05em;
@@ -190,7 +196,7 @@ export default function Home() {
           .lebon-container { font-size: 2.25vw; }
         }
         @media screen and (max-width: 568px) {
-          .lebon-container { font-size: 3vw; }
+          .lebon-container { font-size: 3vw; word-spacing: 1em; }
         }
 
         /* BACK LAYER */
@@ -216,8 +222,8 @@ export default function Home() {
         }
       `}</style>
 
-      {/* LAYER 1 (BACK LAYER) */}
-      <div className="fixed inset-0 z-20 flex items-center justify-center text-center pointer-events-none lebon-container layer-back">
+      {/* LAYER 1 (BACK LAYER) - Ancorato con 100dvh */}
+      <div className="fixed inset-0 h-[100dvh] w-screen z-20 flex items-center justify-center text-center pointer-events-none lebon-container layer-back">
         <div className="w-full px-8">
           {isMounted && stage === 'init' && (
             <span>{typedInit || " "}</span>
@@ -243,8 +249,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* LAYER 2 (FRONT LAYER) */}
-      <div className="fixed inset-0 z-30 flex items-center justify-center text-center pointer-events-none lebon-container layer-front">
+      {/* LAYER 2 (FRONT LAYER) - Ancorato con 100dvh */}
+      <div className="fixed inset-0 h-[100dvh] w-screen z-30 flex items-center justify-center text-center pointer-events-none lebon-container layer-front">
         <div className="w-full px-8">
           {isMounted && stage === 'init' && (
             <span>{typedInit || " "}</span>
@@ -287,17 +293,17 @@ export default function Home() {
         </div>
       </div>
 
-      {/* STAGE GALLERIA FOTO */}
+      {/* STAGE GALLERIA FOTO - Ancoraggio Dynamic Viewport */}
       <div 
         className="absolute inset-[0.5rem] flex items-center justify-center pointer-events-none z-10 bg-white"
-        style={{ height: 'calc(100vh - 1rem)', width: 'calc(100vw - 1rem)' }}
+        style={{ height: 'calc(100dvh - 1rem)', width: 'calc(100vw - 1rem)' }}
       >
         <div className="relative w-full h-full flex items-center justify-center">
           {stage === 'active' && displayedUrl && (
             <img
               src={displayedUrl}
               alt="Gallery Reel"
-              className="h-full w-full object-contain block select-none transform scale-[0.78]"
+              className="h-full w-full object-contain block select-none transform scale-[0.78] sm:scale-[0.78]"
             />
           )}
         </div>
