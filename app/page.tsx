@@ -10,6 +10,18 @@ interface Photo {
   created_at: string;
 }
 
+// Ridimensiona e comprime le immagini al volo via Supabase Storage
+function getOptimizedUrl(originalUrl: string, width: number = 1000) {
+  if (!originalUrl) return '';
+  if (originalUrl.includes('/storage/v1/object/public/')) {
+    return originalUrl.replace(
+      '/storage/v1/object/public/',
+      '/storage/v1/render/image/public/'
+    ) + `?width=${width}&quality=80&resize=contain`;
+  }
+  return originalUrl;
+}
+
 export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [shuffledIndices, setShuffledIndices] = useState<number[]>([]);
@@ -19,20 +31,18 @@ export default function Home() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  const [displayedUrl, setDisplayedUrl] = useState<string | null>(null);
-
   const textInit = "EDOARDO LACERTOSA";
-  const textHold = "EMAIL   INSTAGRAM   PORT";
+  const textHold = "EMAIL   INSTAGRAM   PORTFOLIO";
 
   const [typedInit, setTypedInit] = useState("");
   const [typedHold, setTypedHold] = useState("");
 
-  // Fix Hydration: Abilita il rendering dinamico solo dopo il mount del client
+  // Fix Hydration
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // 1. Fetch Foto e inizializzazione shuffle casuale stile Frank Lebon
+  // 1. Fetch Foto e Shuffle
   useEffect(() => {
     const fetchPhotos = async () => {
       const supabase = createClient();
@@ -45,7 +55,13 @@ export default function Home() {
         const loadedPhotos = data as Photo[];
         setPhotos(loadedPhotos);
 
-        // Crea array di indici casuali (Fisher-Yates shuffle)
+        // Pre-caricamento di TUTTE le miniature ottimizzate nella RAM del browser
+        loadedPhotos.forEach((photo) => {
+          const img = new Image();
+          img.src = getOptimizedUrl(photo.public_url, 1000);
+        });
+
+        // Fisher-Yates shuffle
         const indices = Array.from({ length: loadedPhotos.length }, (_, i) => i);
         for (let i = indices.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -95,7 +111,7 @@ export default function Home() {
     }
   }, [stage, typedHold, isMounted]);
 
-  // 4. FASE 3: Reel Foto Casuale continuo (stile Frank Lebon)
+  // 4. FASE 3: Reel Foto continuo (veloce e fluido)
   useEffect(() => {
     if (!isMounted || stage !== 'active' || photos.length === 0 || shuffledIndices.length === 0) return;
 
@@ -103,7 +119,6 @@ export default function Home() {
       setShufflePointer((prevPointer) => {
         const nextPointer = prevPointer + 1;
         if (nextPointer >= shuffledIndices.length) {
-          // Rimescola quando finisce il giro completo (loop infinito casuale)
           const indices = Array.from({ length: photos.length }, (_, i) => i);
           for (let i = indices.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -114,27 +129,15 @@ export default function Home() {
         }
         return nextPointer;
       });
-    }, 300);
+    }, 250); // Ritmo serrato e costante (250ms)
 
     return () => clearInterval(intervalId);
   }, [stage, photos.length, shuffledIndices.length, isMounted]);
 
-  // Indice corrente basato sullo shuffle casuale
-  const currentIndex = shuffledIndices.length > 0 ? shuffledIndices[shufflePointer] : 0;
-
-  // Pre-caricamento dell'immagine
-  useEffect(() => {
-    if (photos.length === 0) return;
-
-    const nextPhoto = photos[currentIndex];
-    if (!nextPhoto) return;
-
-    const img = new Image();
-    img.src = nextPhoto.public_url;
-    img.onload = () => {
-      setDisplayedUrl(nextPhoto.public_url);
-    };
-  }, [currentIndex, photos]);
+  // Foto corrente ricavata all'istante
+  const currentPhotoIndex = shuffledIndices.length > 0 ? shuffledIndices[shufflePointer] : 0;
+  const currentPhoto = photos[currentPhotoIndex];
+  const displayedUrl = currentPhoto ? getOptimizedUrl(currentPhoto.public_url, 1000) : null;
 
   return (
     <main className="h-screen w-screen bg-white text-black overflow-hidden relative select-none">
@@ -265,7 +268,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* STAGE GALLERIA FOTO (Nessun click) */}
+      {/* STAGE GALLERIA FOTO (Cambio Istantaneo a 60fps) */}
       <div 
         className="absolute inset-[0.5rem] flex items-center justify-center pointer-events-none z-10 bg-white"
         style={{ height: 'calc(100vh - 1rem)', width: 'calc(100vw - 1rem)' }}
@@ -273,9 +276,8 @@ export default function Home() {
         <div className="relative w-full h-full flex items-center justify-center">
           {stage === 'active' && displayedUrl && (
             <img
-              key={displayedUrl}
               src={displayedUrl}
-              alt="Gallery Image"
+              alt="Gallery Reel"
               className="h-full w-full object-contain block select-none transform scale-[0.78]"
             />
           )}
