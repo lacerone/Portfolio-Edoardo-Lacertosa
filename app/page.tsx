@@ -2,173 +2,286 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import ExifReader from 'exifreader';
-import { Upload, Trash2, RefreshCw, Image as ImageIcon } from 'lucide-react';
 
 interface Photo {
   id: string;
   public_url: string;
   title: string;
-  rotation: number;
-  storage_path: string;
-  exif_data: Record<string, unknown>;
+  created_at: string;
 }
 
-export default function AdminDashboard() {
+export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [status, setStatus] = useState('');
-  const supabase = createClient();
+  const [shuffledIndices, setShuffledIndices] = useState<number[]>([]);
+  const [shufflePointer, setShufflePointer] = useState(0);
 
+  const [stage, setStage] = useState<'init' | 'hold' | 'active'>('init');
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  const [displayedUrl, setDisplayedUrl] = useState<string | null>(null);
+
+  const textInit = "EDOARDO LACERTOSA";
+  const textHold = "EMAIL   INSTAGRAM   PORT";
+
+  const [typedInit, setTypedInit] = useState("");
+  const [typedHold, setTypedHold] = useState("");
+
+  // Fix Hydration: Abilita il rendering dinamico solo dopo il mount del client
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // 1. Fetch Foto e inizializzazione shuffle casuale stile Frank Lebon
+  useEffect(() => {
+    const fetchPhotos = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const loadedPhotos = data as Photo[];
+        setPhotos(loadedPhotos);
+
+        // Crea array di indici casuali (Fisher-Yates shuffle)
+        const indices = Array.from({ length: loadedPhotos.length }, (_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        setShuffledIndices(indices);
+        setShufflePointer(0);
+      }
+    };
+
     fetchPhotos();
   }, []);
 
-  const fetchPhotos = async () => {
-    const { data, error } = await supabase
-      .from('photos')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setPhotos(data as Photo[]);
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    setStatus('Parsing EXIF & Caricamento...');
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const tags = ExifReader.load(arrayBuffer);
-
-        const exifData = {
-          camera: tags?.Model?.description || tags?.Make?.description || 'Unknown Camera',
-          lens: tags?.LensModel?.description || 'Standard Lens',
-          iso: tags?.ISOSpeedRatings?.description || tags?.PhotographicSensitivity?.description || 'ISO --',
-          aperture: tags?.FNumber?.description || '',
-          shutter: tags?.ExposureTime?.description || '',
-          focal_length: tags?.FocalLength?.description || '',
-        };
-
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `uploads/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('portfolio-images')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('portfolio-images')
-          .getPublicUrl(filePath);
-
-        const randomRotation = Number((Math.random() * 8 - 4).toFixed(1));
-
-        await supabase.from('photos').insert({
-          title: file.name.replace(/\.[^/.]+$/, ''),
-          storage_path: filePath,
-          public_url: publicUrlData.publicUrl,
-          rotation: randomRotation,
-          exif_data: exifData,
-        });
-
-      } catch (err: unknown) {
-        console.error('Errore durante upload:', err);
+  // 2. FASE 1: Digitazione Nome
+  useEffect(() => {
+    if (!isMounted) return;
+    if (stage === 'init') {
+      if (typedInit.length < textInit.length) {
+        const timeout = setTimeout(() => {
+          setTypedInit(textInit.slice(0, typedInit.length + 1));
+        }, 150);
+        return () => clearTimeout(timeout);
+      } else {
+        const transition = setTimeout(() => {
+          setStage('hold');
+        }, 600);
+        return () => clearTimeout(transition);
       }
     }
+  }, [stage, typedInit, isMounted]);
 
-    setStatus('Caricamento completato!');
-    setUploading(false);
-    fetchPhotos();
-  };
+  // 3. FASE 2: Digitazione Link
+  useEffect(() => {
+    if (!isMounted) return;
+    if (stage === 'hold') {
+      if (typedHold.length < textHold.length) {
+        const timeout = setTimeout(() => {
+          setTypedHold(textHold.slice(0, typedHold.length + 1));
+        }, 150);
+        return () => clearTimeout(timeout);
+      } else {
+        const startReel = setTimeout(() => {
+          setStage('active');
+        }, 400);
+        return () => clearTimeout(startReel);
+      }
+    }
+  }, [stage, typedHold, isMounted]);
 
-  const handleDelete = async (id: string, storagePath: string) => {
-    if (!confirm('Vuoi davvero eliminare questa foto?')) return;
+  // 4. FASE 3: Reel Foto Casuale continuo (stile Frank Lebon)
+  useEffect(() => {
+    if (!isMounted || stage !== 'active' || photos.length === 0 || shuffledIndices.length === 0) return;
 
-    await supabase.storage.from('portfolio-images').remove([storagePath]);
-    await supabase.from('photos').delete().eq('id', id);
-    fetchPhotos();
-  };
+    const intervalId = setInterval(() => {
+      setShufflePointer((prevPointer) => {
+        const nextPointer = prevPointer + 1;
+        if (nextPointer >= shuffledIndices.length) {
+          // Rimescola quando finisce il giro completo (loop infinito casuale)
+          const indices = Array.from({ length: photos.length }, (_, i) => i);
+          for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+          }
+          setShuffledIndices(indices);
+          return 0;
+        }
+        return nextPointer;
+      });
+    }, 300);
+
+    return () => clearInterval(intervalId);
+  }, [stage, photos.length, shuffledIndices.length, isMounted]);
+
+  // Indice corrente basato sullo shuffle casuale
+  const currentIndex = shuffledIndices.length > 0 ? shuffledIndices[shufflePointer] : 0;
+
+  // Pre-caricamento dell'immagine
+  useEffect(() => {
+    if (photos.length === 0) return;
+
+    const nextPhoto = photos[currentIndex];
+    if (!nextPhoto) return;
+
+    const img = new Image();
+    img.src = nextPhoto.public_url;
+    img.onload = () => {
+      setDisplayedUrl(nextPhoto.public_url);
+    };
+  }, [currentIndex, photos]);
 
   return (
-    <main className="min-h-screen bg-[#0D0D0D] text-neutral-100 p-4 md:p-8 max-w-4xl mx-auto">
-      <header className="flex justify-between items-center border-b border-neutral-800 pb-4 mb-6">
-        <div>
-          <h1 className="text-xl font-serif font-bold">Mobile Studio Admin</h1>
-          <p className="text-xs font-mono text-neutral-400">Gestione Scatti & Portfolio</p>
+    <main className="h-screen w-screen bg-white text-black overflow-hidden relative select-none">
+      
+      {/* Font e Layer CSS */}
+      <style>{`
+        @font-face {
+          font-family: "FRANK LEBON Front";
+          src: url("/fonts/FRANKLEBON-Front.woff2") format("woff2");
+          font-weight: 400;
+          font-style: normal;
+          font-display: block;
+        }
+        @font-face {
+          font-family: "FRANK LEBON Back";
+          src: url("/fonts/FRANKLEBON-Back.woff2") format("woff2");
+          font-weight: 400;
+          font-style: normal;
+          font-display: block;
+        }
+
+        .lebon-container {
+          font-size: 0.925vw;
+          letter-spacing: 0.05em;
+          word-spacing: 1.5em;
+          text-transform: uppercase;
+          line-height: 1;
+        }
+
+        @media screen and (max-width: 1024px) {
+          .lebon-container { font-size: 2.25vw; }
+        }
+        @media screen and (max-width: 568px) {
+          .lebon-container { font-size: 3vw; }
+        }
+
+        /* BACK LAYER */
+        .layer-back {
+          font-family: "FRANK LEBON Back", sans-serif;
+          color: #ffffff;
+        }
+        .layer-back a.swap {
+          color: #000000 !important;
+        }
+
+        /* FRONT LAYER */
+        .layer-front {
+          font-family: "FRANK LEBON Front", sans-serif;
+          color: #000000;
+        }
+        .layer-front a {
+          color: #000000;
+          text-decoration: none;
+        }
+        .layer-front a.swap {
+          color: #ffffff !important;
+        }
+      `}</style>
+
+      {/* LAYER 1 (BACK LAYER) */}
+      <div className="fixed inset-0 z-20 flex items-center justify-center text-center pointer-events-none lebon-container layer-back">
+        <div className="w-full px-8">
+          {isMounted && stage === 'init' && (
+            <span>{typedInit || " "}</span>
+          )}
+
+          {isMounted && (stage === 'hold' || stage === 'active') && (
+            <span>
+              <a className={hoveredIndex === 0 ? 'swap' : ''}>
+                {typedHold.slice(0, 5)}
+              </a>
+              {typedHold.length > 5 && (
+                <a className={`ml-[1.5em] ${hoveredIndex === 1 ? 'swap' : ''}`}>
+                  {typedHold.slice(8, 17)}
+                </a>
+              )}
+              {typedHold.length > 17 && (
+                <a className={`ml-[1.5em] ${hoveredIndex === 2 ? 'swap' : ''}`}>
+                  {typedHold.slice(20)}
+                </a>
+              )}
+            </span>
+          )}
         </div>
-        <button
-          onClick={fetchPhotos}
-          className="p-2 bg-neutral-900 border border-neutral-800 rounded-lg text-neutral-300 hover:text-white"
-        >
-          <RefreshCw size={18} />
-        </button>
-      </header>
+      </div>
 
-      <section className="mb-8">
-        <label className="border-2 border-dashed border-neutral-800 hover:border-neutral-600 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer bg-neutral-900/40 transition-colors">
-          <Upload size={32} className="text-neutral-400 mb-2" />
-          <span className="text-sm font-medium">Seleziona foto dal rullino</span>
-          <span className="text-xs text-neutral-500 font-mono mt-1">Caricamento multiplo</span>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileUpload}
-            disabled={uploading}
-            className="hidden"
-          />
-        </label>
-        {status && <p className="mt-2 text-xs font-mono text-center text-neutral-400">{status}</p>}
-      </section>
+      {/* LAYER 2 (FRONT LAYER) */}
+      <div className="fixed inset-0 z-30 flex items-center justify-center text-center pointer-events-none lebon-container layer-front">
+        <div className="w-full px-8">
+          {isMounted && stage === 'init' && (
+            <span>{typedInit || " "}</span>
+          )}
 
-      <section>
-        <h2 className="text-sm font-mono uppercase tracking-wider text-neutral-400 mb-4 flex items-center gap-2">
-          <ImageIcon size={16} /> Foto Caricate ({photos.length})
-        </h2>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {photos.map((photo) => (
-            <div
-              key={photo.id}
-              className="bg-neutral-900 border border-neutral-800 p-2 rounded-lg relative group overflow-hidden"
-            >
-              <div className="aspect-square relative overflow-hidden rounded bg-neutral-950">
-                <img
-                  src={photo.public_url}
-                  alt={photo.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              <div className="mt-2 text-[10px] font-mono text-neutral-400 truncate">
-                {photo.title}
-              </div>
-
-              <div className="mt-1 text-[9px] font-mono text-neutral-500 flex justify-between">
-                <span>Rotazione: {photo.rotation} deg</span>
-              </div>
-
-              <button
-                onClick={() => handleDelete(photo.id, photo.storage_path)}
-                className="absolute top-3 right-3 p-1.5 bg-red-950/80 text-red-400 rounded-md border border-red-800/50 hover:bg-red-900 transition-colors"
+          {isMounted && (stage === 'hold' || stage === 'active') && (
+            <span className="pointer-events-auto">
+              <a 
+                href="mailto:edoardo.lacertosa@gmail.com"
+                className={hoveredIndex === 0 ? 'swap' : ''}
+                onMouseEnter={() => setHoveredIndex(0)}
+                onMouseLeave={() => setHoveredIndex(null)}
               >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
+                {typedHold.slice(0, 5)}
+              </a>
+              {typedHold.length > 5 && (
+                <a 
+                  href="https://instagram.com" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className={`ml-[1.5em] ${hoveredIndex === 1 ? 'swap' : ''}`}
+                  onMouseEnter={() => setHoveredIndex(1)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                >
+                  {typedHold.slice(8, 17)}
+                </a>
+              )}
+              {typedHold.length > 17 && (
+                <a 
+                  href="/port" 
+                  className={`ml-[1.5em] ${hoveredIndex === 2 ? 'swap' : ''}`}
+                  onMouseEnter={() => setHoveredIndex(2)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                >
+                  {typedHold.slice(20)}
+                </a>
+              )}
+            </span>
+          )}
         </div>
-      </section>
+      </div>
+
+      {/* STAGE GALLERIA FOTO (Nessun click) */}
+      <div 
+        className="absolute inset-[0.5rem] flex items-center justify-center pointer-events-none z-10 bg-white"
+        style={{ height: 'calc(100vh - 1rem)', width: 'calc(100vw - 1rem)' }}
+      >
+        <div className="relative w-full h-full flex items-center justify-center">
+          {stage === 'active' && displayedUrl && (
+            <img
+              key={displayedUrl}
+              src={displayedUrl}
+              alt="Gallery Image"
+              className="h-full w-full object-contain block select-none transform scale-[0.78]"
+            />
+          )}
+        </div>
+      </div>
+
     </main>
   );
 }
