@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sliders, ArrowLeft } from 'lucide-react';
+import { X, Sliders } from 'lucide-react';
 import Link from 'next/link';
 
 interface ExifData {
@@ -15,21 +15,29 @@ interface ExifData {
   focal_length?: string;
 }
 
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 interface Photo {
   id: string;
   public_url: string;
   title: string;
+  group_id?: string;
   collection?: string;
   exif_data?: ExifData;
   created_at: string;
+  is_cover?: boolean;
 }
 
-const BATCH_SIZE = 48;
-const INFINITE_LOOP = true;
-const GAP = 8; // Spazio in pixel tra le foto
-const TARGET_ROW_HEIGHT = 260; // Altezza indicativa desiderata per le righe
+const GAP = 12;
+const TARGET_ROW_HEIGHT = 280;
 
-function getOptimizedUrl(originalUrl: string, width: number = 800) {
+const supabase = createClient();
+
+function getOptimizedUrl(originalUrl: string, width: number = 1000) {
   if (!originalUrl) return '';
   if (originalUrl.includes('/storage/v1/object/public/')) {
     return originalUrl.replace(
@@ -40,27 +48,173 @@ function getOptimizedUrl(originalUrl: string, width: number = 800) {
   return originalUrl;
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  const out = [...arr];
-  for (let i = out.length - 1; i > 0; i--) {
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  return out;
+  return shuffled;
+}
+
+function isTouchDevice() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(hover: none)').matches || 'ontouchstart' in window;
+}
+
+function InteractiveReelRow({
+  groups,
+  photos,
+  direction,
+  onSelectGroup,
+}: {
+  groups: Group[];
+  photos: Photo[];
+  direction: 1 | -1;
+  onSelectGroup: (group: Group) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const xRef = useRef(0);
+  const velocityRef = useRef(0);
+  const [activeMobileKey, setActiveMobileKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      const scrollForce = (Math.abs(e.deltaY) + Math.abs(e.deltaX)) * 0.06;
+      velocityRef.current += scrollForce;
+    };
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const deltaX = e.touches[0].clientX - touchStartX;
+      const deltaY = e.touches[0].clientY - touchStartY;
+      const swipeForce = (Math.abs(deltaX) + Math.abs(deltaY)) * 0.08;
+      velocityRef.current += swipeForce;
+
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, []);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    const baseSpeed = 0.35;
+
+    const loop = () => {
+      const currentSpeed = baseSpeed + velocityRef.current;
+      velocityRef.current *= 0.93;
+
+      xRef.current += currentSpeed * direction;
+
+      if (trackRef.current) {
+        const halfWidth = trackRef.current.scrollWidth / 2;
+        if (halfWidth > 0) {
+          if (xRef.current <= -halfWidth) {
+            xRef.current += halfWidth;
+          } else if (xRef.current >= 0) {
+            xRef.current -= halfWidth;
+          }
+          trackRef.current.style.transform = `translate3d(${xRef.current}px, 0, 0)`;
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(loop);
+    };
+
+    animationFrameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [direction]);
+
+  const reelItems = useMemo(() => {
+    if (groups.length === 0) return [];
+    return [...groups, ...groups, ...groups, ...groups, ...groups, ...groups];
+  }, [groups]);
+
+  const handleCardClick = (group: Group, itemKey: string) => {
+    if (isTouchDevice()) {
+      if (activeMobileKey === itemKey) {
+        onSelectGroup(group);
+      } else {
+        setActiveMobileKey(itemKey);
+      }
+    } else {
+      onSelectGroup(group);
+    }
+  };
+
+  return (
+    <div className="w-full h-[50vh] relative overflow-hidden bg-black flex items-center">
+      <div ref={trackRef} className="flex h-full w-max shrink-0 will-change-transform">
+        {reelItems.map((group, idx) => {
+          const itemKey = `reel-${group.id}-${idx}`;
+
+          const cover =
+            photos.find((p) => p.group_id === group.id && p.is_cover) ||
+            photos.find((p) => p.group_id === group.id);
+
+          const isMobileActive = activeMobileKey === itemKey;
+
+          return (
+            <div
+              key={itemKey}
+              onClick={() => handleCardClick(group, itemKey)}
+              className="relative h-[50vh] w-[70vw] sm:w-[45vw] md:w-[35vw] bg-neutral-900 shrink-0 group cursor-pointer overflow-hidden border-r border-black select-none"
+            >
+              {cover && (
+                <img
+                  src={getOptimizedUrl(cover.public_url, 1000)}
+                  alt={group.name}
+                  className="w-full h-full object-cover block transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+              )}
+
+              <div
+                className={`absolute inset-0 bg-black/60 transition-opacity duration-300 flex items-center justify-center p-6 text-center text-white lebon-font uppercase ${
+                  isMobileActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                <span className="text-base sm:text-2xl md:text-3xl font-bold tracking-widest leading-tight drop-shadow-md px-2">
+                  {group.name}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function Portfolio() {
-  const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
-  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
+
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [loadedRatios, setLoadedRatios] = useState<Record<string, number>>({});
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Misura la larghezza esatta del viewport per il calcolo pixel-perfect
   useEffect(() => {
     if (!containerRef.current) return;
     const updateWidth = () => {
@@ -72,55 +226,33 @@ export default function Portfolio() {
     const observer = new ResizeObserver(updateWidth);
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [loading]);
+  }, [loading, selectedGroup]);
 
   useEffect(() => {
-    const fetchPhotos = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('photos')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const fetchData = async () => {
+      setLoading(true);
 
-      if (!error && data) {
-        setAllPhotos(shuffle(data as Photo[]));
-      }
+      const [groupsRes, photosRes] = await Promise.all([
+        supabase.from('groups').select('*').order('name', { ascending: true }),
+        supabase.from('photos').select('*').order('created_at', { ascending: false })
+      ]);
+
+      if (groupsRes.data) setGroups(groupsRes.data as Group[]);
+      if (photosRes.data) setPhotos(photosRes.data as Photo[]);
+
       setLoading(false);
     };
 
-    fetchPhotos();
+    fetchData();
   }, []);
 
-  const tiles = useMemo(() => {
-    if (allPhotos.length === 0) return [];
-    const total = INFINITE_LOOP
-      ? visibleCount
-      : Math.min(visibleCount, allPhotos.length);
+  const shuffledGroupsRow1 = useMemo(() => shuffleArray(groups), [groups]);
+  const shuffledGroupsRow2 = useMemo(() => shuffleArray(groups), [groups]);
 
-    const out: { photo: Photo; key: string }[] = [];
-    for (let i = 0; i < total; i++) {
-      const lap = Math.floor(i / allPhotos.length);
-      const photo = allPhotos[i % allPhotos.length];
-      out.push({ photo, key: `${photo.id}-${lap}` });
-    }
-    return out;
-  }, [allPhotos, visibleCount]);
-
-  const canGrow = allPhotos.length > 0 && (INFINITE_LOOP || visibleCount < allPhotos.length);
-
-  useEffect(() => {
-    if (!sentinelRef.current || !canGrow) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((c) => c + BATCH_SIZE);
-        }
-      },
-      { rootMargin: '1200px' }
-    );
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [canGrow]);
+  const currentProjectPhotos = useMemo(() => {
+    if (!selectedGroup) return [];
+    return photos.filter((p) => p.group_id === selectedGroup.id);
+  }, [photos, selectedGroup]);
 
   const handleImgLoad = (id: string) => (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -133,35 +265,31 @@ export default function Portfolio() {
     }
   };
 
-  // ALGORITMO JUSTIFIED (FLICKR): Calcola le proporzioni matematiche esatte per azzerare i buchi
   const layoutRows = useMemo(() => {
-    if (!containerWidth || tiles.length === 0) return [];
+    if (!containerWidth || currentProjectPhotos.length === 0) return [];
 
     const rows: {
-      items: { photo: Photo; key: string; width: number; ratio: number }[];
+      items: { photo: Photo; width: number; ratio: number }[];
       height: number;
     }[] = [];
 
-    let currentRow: { photo: Photo; key: string; ratio: number }[] = [];
+    let currentRow: { photo: Photo; ratio: number }[] = [];
     let currentAspectSum = 0;
 
-    tiles.forEach((tile, index) => {
-      // Usa il ratio reale caricato, altrimenti default 4:3 (1.333)
-      const ratio = loadedRatios[tile.photo.id] || 1.333;
-      currentRow.push({ ...tile, ratio });
+    currentProjectPhotos.forEach((photo, index) => {
+      const ratio = loadedRatios[photo.id] || 1.333;
+      currentRow.push({ photo, ratio });
       currentAspectSum += ratio;
 
       const gapsTotalWidth = (currentRow.length - 1) * GAP;
       const availableWidth = containerWidth - gapsTotalWidth;
       const calculatedHeight = availableWidth / currentAspectSum;
 
-      // Se l'altezza calcolata scende sotto la soglia desiderata o siamo alla fine, chiudiamo la riga
-      if (calculatedHeight <= TARGET_ROW_HEIGHT || index === tiles.length - 1) {
-        const rowHeight = Math.max(calculatedHeight, 140);
+      if (calculatedHeight <= TARGET_ROW_HEIGHT || index === currentProjectPhotos.length - 1) {
+        const rowHeight = Math.max(calculatedHeight, 160);
 
         const items = currentRow.map((item) => ({
           photo: item.photo,
-          key: item.key,
           ratio: item.ratio,
           width: item.ratio * rowHeight,
         }));
@@ -173,10 +301,10 @@ export default function Portfolio() {
     });
 
     return rows;
-  }, [tiles, containerWidth, loadedRatios]);
+  }, [currentProjectPhotos, containerWidth, loadedRatios]);
 
   return (
-    <main className="min-h-screen w-full bg-white text-black m-0 p-0 font-sans select-none overflow-x-hidden">
+    <main className="h-screen w-screen bg-black text-white m-0 p-0 font-sans select-none overflow-hidden relative">
       <style jsx global>{`
         @font-face {
           font-family: "FRANK LEBON Front";
@@ -185,111 +313,152 @@ export default function Portfolio() {
           font-style: normal;
           font-display: swap;
         }
-        @font-face {
-          font-family: "LEBON";
-          src: url("/fonts/LEBON-DirectorsCut.woff2") format("woff2");
-          font-weight: normal;
-          font-style: normal;
-          font-display: swap;
-        }
 
         .lebon-font {
-          font-family: "FRANK LEBON Front", "LEBON", sans-serif;
+          font-family: "FRANK LEBON Front", sans-serif;
         }
 
-        ::-webkit-scrollbar {
-          display: none;
-          width: 0px;
-          height: 0px;
-          background: transparent;
-        }
-
+        ::-webkit-scrollbar { display: none; }
         html, body {
           scrollbar-width: none;
-          -ms-overflow-style: none;
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          overflow-x: hidden;
-          background: #ffffff;
+          margin: 0; padding: 0; width: 100vw; height: 100vh;
+          overflow: hidden; background: #000000;
         }
       `}</style>
 
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md py-3 px-4 mb-2 flex justify-between items-center border-b border-neutral-100">
+      {/* TASTO HOME: PICCOLISSIMO PALLINO ELEGANTE MINIMALE (ZERO TESTO) */}
+      {!selectedGroup && (
         <Link
           href="/"
-          className="text-[11px] lebon-font uppercase tracking-widest flex items-center gap-2 hover:opacity-60 transition-opacity"
+          title="Torna alla Home"
+          className="fixed top-5 left-5 z-50 p-2.5 flex items-center justify-center group cursor-pointer"
         >
-          <ArrowLeft size={14} /> HOME
+          <div className="w-2 h-2 rounded-full bg-white/70 group-hover:bg-white group-hover:scale-125 transition-all shadow-sm backdrop-blur-md" />
         </Link>
-        <span className="text-[11px] lebon-font uppercase tracking-widest text-neutral-400">
-          PORTFOLIO ARCHIVE ({allPhotos.length})
-        </span>
-      </header>
+      )}
 
       {loading ? (
-        <div className="min-h-[70vh] flex items-center justify-center text-[10px] lebon-font text-neutral-400 uppercase tracking-widest animate-pulse">
+        <div className="h-full w-full flex items-center justify-center text-[10px] lebon-font text-neutral-500 uppercase tracking-widest animate-pulse">
           CARICAMENTO ARCHIVIO...
         </div>
-      ) : allPhotos.length === 0 ? (
-        <div className="min-h-[70vh] flex items-center justify-center text-[10px] lebon-font text-neutral-500 uppercase">
-          Nessuno scatto presente nel portfolio.
-        </div>
       ) : (
-        <div ref={containerRef} className="w-full p-2 sm:p-4">
-          <div className="flex flex-col" style={{ gap: `${GAP}px` }}>
-            {layoutRows.map((row, rowIndex) => (
-              <div
-                key={`row-${rowIndex}`}
-                className="flex w-full overflow-hidden"
-                style={{ gap: `${GAP}px`, height: `${row.height}px` }}
+        <AnimatePresence mode="wait">
+          {!selectedGroup && (
+            <div key="index-reels" className="h-screen w-screen flex flex-col justify-between overflow-hidden relative bg-black">
+              <motion.div
+                initial={{ y: 0, opacity: 1 }}
+                exit={{ y: '-50vh', opacity: 0 }}
+                transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+                className="h-[50vh] w-full overflow-hidden"
               >
-                {row.items.map(({ photo, key, ratio }) => {
-                  const collectionName = photo.collection || photo.title || 'UNNAMED COLLECTION';
-                  const thumbnailSrc = getOptimizedUrl(photo.public_url, 800);
+                <InteractiveReelRow
+                  groups={shuffledGroupsRow1}
+                  photos={photos}
+                  direction={1}
+                  onSelectGroup={(g) => setSelectedGroup(g)}
+                />
+              </motion.div>
 
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => setSelectedPhoto(photo)}
-                      style={{
-                        flexGrow: ratio,
-                        flexShrink: 1,
-                        flexBasis: '0px',
-                        height: `${row.height}px`,
-                      }}
-                      className="relative group cursor-pointer overflow-hidden bg-neutral-100 shadow-sm hover:z-20 transition-all duration-300"
-                    >
-                      <img
-                        src={thumbnailSrc}
-                        alt={photo.title || 'Portfolio Image'}
-                        className="w-full h-full block object-contain transition-transform duration-500 ease-out group-hover:scale-105"
-                        loading="lazy"
-                        decoding="async"
-                        onLoad={handleImgLoad(photo.id)}
-                      />
-
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4 text-center">
-                        <span className="text-white text-[11px] sm:text-[13px] lebon-font uppercase tracking-widest drop-shadow-md">
-                          {collectionName}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-
-          {canGrow && (
-            <div
-              ref={sentinelRef}
-              className="h-24 w-full flex items-center justify-center text-[9px] lebon-font text-neutral-300 uppercase tracking-widest"
-            >
-              • • •
+              <motion.div
+                initial={{ y: 0, opacity: 1 }}
+                exit={{ y: '50vh', opacity: 0 }}
+                transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+                className="h-[50vh] w-full overflow-hidden"
+              >
+                <InteractiveReelRow
+                  groups={shuffledGroupsRow2}
+                  photos={photos}
+                  direction={-1}
+                  onSelectGroup={(g) => setSelectedGroup(g)}
+                />
+              </motion.div>
             </div>
           )}
-        </div>
+
+          {selectedGroup && (
+            <motion.div
+              key="project-page"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="h-full w-full overflow-y-auto pt-16 p-6 sm:p-12 bg-white text-black"
+            >
+              <div ref={containerRef} className="w-full max-w-7xl mx-auto">
+                <div className="mb-8 border-b border-neutral-200 pb-4 lebon-font uppercase flex justify-between items-end">
+                  <div>
+                    <button
+                      onClick={() => setSelectedGroup(null)}
+                      className="text-[10px] text-neutral-400 hover:text-black mb-2 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      &larr; TORNA AI PROGETTI
+                    </button>
+                    <h1 className="text-xl sm:text-3xl font-bold tracking-widest">
+                      {selectedGroup.name}
+                    </h1>
+                    {selectedGroup.description && (
+                      <p className="text-[11px] text-neutral-500 normal-case font-mono mt-1">
+                        {selectedGroup.description}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-neutral-400 font-mono tracking-widest">
+                    [{currentProjectPhotos.length} FRAMES]
+                  </span>
+                </div>
+
+                {currentProjectPhotos.length === 0 ? (
+                  <div className="min-h-[50vh] flex items-center justify-center text-[10px] lebon-font text-neutral-400 uppercase tracking-widest">
+                    Nessuno scatto presente in questo progetto.
+                  </div>
+                ) : (
+                  <div className="flex flex-col pb-12" style={{ gap: `${GAP}px` }}>
+                    {layoutRows.map((row, rowIndex) => (
+                      <div
+                        key={`row-${rowIndex}`}
+                        className="flex w-full overflow-hidden"
+                        style={{ gap: `${GAP}px`, height: `${row.height}px` }}
+                      >
+                        {row.items.map(({ photo, ratio }) => {
+                          const thumbnailSrc = getOptimizedUrl(photo.public_url, 800);
+
+                          return (
+                            <div
+                              key={photo.id}
+                              onClick={() => setSelectedPhoto(photo)}
+                              style={{
+                                flexGrow: ratio,
+                                flexShrink: 1,
+                                flexBasis: '0px',
+                                height: `${row.height}px`,
+                              }}
+                              className="relative group cursor-pointer overflow-hidden bg-neutral-100 shadow-xs hover:z-20 transition-all duration-300"
+                            >
+                              <img
+                                src={thumbnailSrc}
+                                alt={photo.title || 'Scatto'}
+                                className="w-full h-full block object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+                                loading="lazy"
+                                decoding="async"
+                                onLoad={handleImgLoad(photo.id)}
+                              />
+
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4">
+                                <span className="text-white text-[11px] lebon-font uppercase tracking-widest">
+                                  {photo.title || 'INGRANDISCI'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       )}
 
       <AnimatePresence>
@@ -303,11 +472,11 @@ export default function Portfolio() {
           >
             <div className="flex justify-between items-center text-xs border-b border-neutral-200 pb-3">
               <span className="text-black font-bold text-[10px] uppercase">
-                {selectedPhoto.collection ? `${selectedPhoto.collection} — ` : ''}{selectedPhoto.title || 'DETTAGLIO FOTOGRAMMA'}
+                {selectedGroup?.name} — {selectedPhoto.title || 'DETTAGLIO'}
               </span>
               <button
                 onClick={() => setSelectedPhoto(null)}
-                className="p-1.5 border border-neutral-200 text-neutral-600 hover:text-black transition-colors"
+                className="p-1.5 border border-neutral-200 text-neutral-600 hover:text-black transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -324,7 +493,7 @@ export default function Portfolio() {
             {selectedPhoto.exif_data && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="bg-neutral-100 border border-neutral-200 p-4 rounded-xs max-w-xl mx-auto w-full text-[10px] text-neutral-700"
+                className="bg-neutral-100 border border-neutral-200 p-4 rounded-2xs max-w-xl mx-auto w-full text-[10px] text-neutral-700"
               >
                 <div className="flex items-center gap-1.5 text-[9px] text-neutral-500 uppercase tracking-widest mb-2 font-bold border-b border-neutral-200 pb-1.5">
                   <Sliders size={10} /> REGISTRO EXIF

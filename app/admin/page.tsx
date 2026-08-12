@@ -2,9 +2,9 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
-import { Upload, Trash2, Folder, Plus, Layers, Shuffle, Loader2, LogOut, Lock } from 'lucide-react';
+import { Upload, Trash2, Folder, Plus, Layers, Loader2, LogOut, Lock, Star } from 'lucide-react';
 
 interface Group {
   id: string;
@@ -19,16 +19,11 @@ interface Photo {
   group_id?: string;
   collection?: string;
   created_at: string;
+  is_cover?: boolean; // Campo Copertina
 }
 
-// Estensione del tipo Photo per includere un ID di istanza unico nel feed infinito
-interface DisplayPhoto extends Photo {
-  instanceId: string;
-}
+const supabase = createClient();
 
-const BATCH_SIZE = 12; // Foto da aggiungere ad ogni ciclo di scroll
-
-// Ridimensiona e trasforma le miniature al volo per la griglia admin
 function getOptimizedUrl(originalUrl: string, width: number = 500) {
   if (!originalUrl) return '';
   if (originalUrl.includes('/storage/v1/object/public/')) {
@@ -40,71 +35,53 @@ function getOptimizedUrl(originalUrl: string, width: number = 500) {
   return originalUrl;
 }
 
-// Algoritmo di Fisher-Yates per mescolare l'array in modo veramente casuale
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
 export default function AdminPage() {
-  const supabase = createClient();
-
-  // Stati per Auth (Supabase Authentication)
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Stati della pagina Admin
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // Lista dinamica delle foto mostrate nell'infinite scroll
-  const [displayedPhotos, setDisplayedPhotos] = useState<DisplayPhoto[]>([]);
-
-  // Form Nuova Foto
   const [title, setTitle] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Form Nuovo Gruppo
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
 
-  // Filtro attivo
   const [activeFilter, setActiveFilter] = useState<string>('ALL');
 
-  // Ref per l'elemento sentinella dell'Infinite Scroll
-  const observerTarget = useRef<HTMLDivElement>(null);
-
-  // 1. Verifica della sessione di login
   useEffect(() => {
+    let mounted = true;
+
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setAuthLoading(false);
+      if (mounted) {
+        setUser(user);
+        setAuthLoading(false);
+      }
     };
 
     checkAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
+      if (mounted) {
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+      }
     });
 
     return () => {
+      mounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
 
-  // Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -114,37 +91,13 @@ export default function AdminPage() {
     }
   };
 
-  // Logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
 
-  // Funzione per generare un blocco di foto casuali dal pool filtrato
-  const generateRandomBatch = useCallback((pool: Photo[], count: number): DisplayPhoto[] => {
-    if (pool.length === 0) return [];
-    
-    const batch: DisplayPhoto[] = [];
-    let currentDeck = shuffleArray(pool);
-
-    while (batch.length < count) {
-      if (currentDeck.length === 0) {
-        currentDeck = shuffleArray(pool);
-      }
-      const photo = currentDeck.pop()!;
-      batch.push({
-        ...photo,
-        instanceId: `${photo.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
-      });
-    }
-
-    return batch;
-  }, []);
-
-  // Fetch dei dati da Supabase (attivato solo se l'utente è loggato)
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
 
-    // Fetch Gruppi
     const { data: groupsData } = await supabase
       .from('groups')
       .select('*')
@@ -157,78 +110,65 @@ export default function AdminPage() {
       }
     }
 
-    // Fetch Foto
     const { data: photosData } = await supabase
       .from('photos')
-      .select('*');
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (photosData) {
-      const rawPhotos = photosData as Photo[];
-      setPhotos(rawPhotos);
-      setDisplayedPhotos(generateRandomBatch(rawPhotos, BATCH_SIZE));
+      setPhotos(photosData as Photo[]);
     }
 
     setLoading(false);
-  };
+  }, [selectedGroupId]);
 
   useEffect(() => {
     if (user) {
       fetchData();
     }
-  }, [user]);
+  }, [user, fetchData]);
 
-  // Ottieni il pool di foto in base al filtro attivo
-  const getFilteredPool = useCallback(() => {
-    if (activeFilter === 'ALL') return photos;
-    if (activeFilter === 'UNGROUPED') return photos.filter((p) => !p.group_id);
-    return photos.filter((p) => p.group_id === activeFilter);
-  }, [photos, activeFilter]);
+  const filteredPhotos = photos.filter((p) => {
+    if (activeFilter === 'ALL') return true;
+    if (activeFilter === 'UNGROUPED') return !p.group_id;
+    return p.group_id === activeFilter;
+  });
 
-  // Quando cambia il filtro attivo, resetta e rimescola completamente il feed
-  useEffect(() => {
-    if (!user) return;
-    const pool = getFilteredPool();
-    setDisplayedPhotos(generateRandomBatch(pool, BATCH_SIZE));
-  }, [activeFilter, getFilteredPool, generateRandomBatch, user]);
+  // GESTIONE COPERTINA (Max 1 Copertina per Gruppo)
+  const handleSetCover = async (photo: Photo) => {
+    if (!photo.group_id) {
+      return alert('Assegna prima la foto ad un gruppo per poterla impostare come copertina!');
+    }
 
-  // Funzione per caricare ALTRE foto mischiate quando si arriva in fondo
-  const loadMorePhotos = useCallback(() => {
-    const pool = getFilteredPool();
-    if (pool.length === 0) return;
+    try {
+      // 1. Disattiva la copertina precedente per TUTTE le foto del gruppo
+      await supabase
+        .from('photos')
+        .update({ is_cover: false })
+        .eq('group_id', photo.group_id);
 
-    const nextBatch = generateRandomBatch(pool, BATCH_SIZE);
-    setDisplayedPhotos((prev) => [...prev, ...nextBatch]);
-  }, [getFilteredPool, generateRandomBatch]);
+      // 2. Imposta come copertina solo la foto selezionata
+      const { error } = await supabase
+        .from('photos')
+        .update({ is_cover: true })
+        .eq('id', photo.id);
 
-  // Pulsante per rimescolare manualmente da zero
-  const handleReshuffle = () => {
-    const pool = getFilteredPool();
-    setDisplayedPhotos(generateRandomBatch(pool, BATCH_SIZE));
+      if (error) throw error;
+
+      // Aggiorna lo stato locale
+      setPhotos((prev) =>
+        prev.map((p) => {
+          if (p.group_id === photo.group_id) {
+            return { ...p, is_cover: p.id === photo.id };
+          }
+          return p;
+        })
+      );
+    } catch (err: any) {
+      alert('Errore impostazione copertina: ' + err.message);
+    }
   };
 
-  // Intersection Observer per l'Infinite Scroll
-  useEffect(() => {
-    if (!user) return;
-    const target = observerTarget.current;
-    if (!target) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !loading) {
-          loadMorePhotos();
-        }
-      },
-      { threshold: 0.2 }
-    );
-
-    observer.observe(target);
-
-    return () => {
-      observer.unobserve(target);
-    };
-  }, [loadMorePhotos, loading, user]);
-
-  // 1. Crea Nuovo Gruppo
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGroupName.trim()) return alert('Inserisci il nome del gruppo!');
@@ -249,21 +189,19 @@ export default function AdminPage() {
     }
   };
 
-  // 2. Eliminazione Gruppo
   const handleDeleteGroup = async (groupId: string, groupName: string) => {
-    if (!confirm(`Sei sicuro di voler eliminare il gruppo "${groupName}"? Le foto rimanenti non verranno eliminate.`)) return;
+    if (!confirm(`Eliminare il gruppo "${groupName}"?`)) return;
 
     const { error } = await supabase.from('groups').delete().eq('id', groupId);
 
     if (error) {
-      alert('Errore eliminazione gruppo: ' + error.message);
+      alert('Errore eliminazione: ' + error.message);
     } else {
       setGroups((prev) => prev.filter((g) => g.id !== groupId));
       if (activeFilter === groupId) setActiveFilter('ALL');
     }
   };
 
-  // 3. Upload Foto in un Gruppo
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return alert('Seleziona una foto!');
@@ -300,6 +238,7 @@ export default function AdminPage() {
             title: finalTitle,
             group_id: selectedGroupId || null,
             collection: targetGroup ? targetGroup.name : 'General',
+            is_cover: false,
           },
         ])
         .select()
@@ -311,24 +250,17 @@ export default function AdminPage() {
       setSelectedFile(null);
       
       if (newPhoto) {
-        const added = newPhoto as Photo;
-        setPhotos((prev) => [added, ...prev]);
-        setDisplayedPhotos((prev) => [
-          { ...added, instanceId: `${added.id}-${Date.now()}` },
-          ...prev,
-        ]);
+        setPhotos((prev) => [newPhoto as Photo, ...prev]);
       }
 
-      alert('Foto caricata con successo!');
+      alert('Foto caricata!');
     } catch (err: any) {
-      console.error(err);
-      alert('Errore durante il caricamento: ' + err.message);
+      alert('Errore caricamento: ' + err.message);
     } finally {
       setUploading(false);
     }
   };
 
-  // 4. Cambia Gruppo a una Foto Esistente
   const handleUpdatePhotoGroup = async (photoId: string, newGroupId: string) => {
     const targetGroup = groups.find((g) => g.id === newGroupId);
 
@@ -337,6 +269,7 @@ export default function AdminPage() {
       .update({
         group_id: newGroupId || null,
         collection: targetGroup ? targetGroup.name : 'General',
+        is_cover: false, // resetta copertina se spostata di gruppo
       })
       .eq('id', photoId);
 
@@ -346,23 +279,15 @@ export default function AdminPage() {
       setPhotos((prev) =>
         prev.map((p) =>
           p.id === photoId
-            ? { ...p, group_id: newGroupId, collection: targetGroup?.name }
-            : p
-        )
-      );
-      setDisplayedPhotos((prev) =>
-        prev.map((p) =>
-          p.id === photoId
-            ? { ...p, group_id: newGroupId, collection: targetGroup?.name }
+            ? { ...p, group_id: newGroupId, collection: targetGroup?.name, is_cover: false }
             : p
         )
       );
     }
   };
 
-  // 5. Elimina Foto dal DB e dallo Storage
   const handleDeletePhoto = async (photo: Photo) => {
-    if (!confirm(`Eliminare definitivamente "${photo.title}"?`)) return;
+    if (!confirm(`Eliminare "${photo.title}"?`)) return;
 
     try {
       await supabase.from('photos').delete().eq('id', photo.id);
@@ -373,26 +298,19 @@ export default function AdminPage() {
       }
 
       setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
-      setDisplayedPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     } catch (err: any) {
       alert('Errore eliminazione: ' + err.message);
     }
   };
 
-  const poolSize = getFilteredPool().length;
-
-  // --- RENDER STATI DI AUTENTICAZIONE ---
-
-  // 1. Caricamento della sessione
   if (authLoading) {
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-400 font-mono text-xs flex items-center justify-center">
-        VERIFICA ACCESSO IN CORSO...
+        VERIFICA ACCESSO...
       </div>
     );
   }
 
-  // 2. Schermata Login (se non autenticato)
   if (!user) {
     return (
       <div className="min-h-screen bg-neutral-950 text-white font-mono text-xs flex items-center justify-center p-4 select-none">
@@ -441,22 +359,19 @@ export default function AdminPage() {
     );
   }
 
-  // 3. Schermata Admin completa (se autenticato)
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6 md:p-12 font-mono text-xs">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-center border-b border-neutral-800 pb-4 mb-8">
         <h1 className="text-sm font-bold tracking-widest uppercase flex items-center gap-2">
           <Layers size={16} /> GESTORE ARCHIVIO & GRUPPI
         </h1>
         <div className="flex items-center gap-4">
           <a href="/" className="text-neutral-400 hover:text-white transition-colors">
-            &larr; TORNA ALLA HOME
+            &larr; HOME
           </a>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-1.5 text-red-400 hover:text-red-300 hover:border-red-900 transition-colors rounded-xs cursor-pointer uppercase"
+            className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-1.5 text-red-400 hover:text-red-300 transition-colors rounded-xs cursor-pointer uppercase"
           >
             <LogOut size={12} /> LOGOUT
           </button>
@@ -464,11 +379,7 @@ export default function AdminPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* COLONNA SINISTRA: CREA GRUPPI & UPLOAD */}
         <div className="space-y-6">
-          
-          {/* SEZIONE 1: CREA GRUPPO */}
           <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-sm">
             <h2 className="text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2 text-white">
               <Plus size={14} /> Crea Nuovo Gruppo
@@ -503,7 +414,6 @@ export default function AdminPage() {
             </form>
           </div>
 
-          {/* SEZIONE 2: UPLOAD FOTO */}
           <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-sm">
             <h2 className="text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2 text-white">
               <Upload size={14} /> Carica Nuova Foto
@@ -555,145 +465,136 @@ export default function AdminPage() {
               </button>
             </form>
           </div>
-
         </div>
 
-        {/* COLONNA DESTRA: GALLERY CON FLUSSO INFINITO MISCHIATO */}
         <div className="lg:col-span-2">
-          
-          {/* BARRA FILTRI & PULSANTE RIMESCOLA */}
-          <div className="flex flex-wrap justify-between items-center gap-2 pb-4 mb-4 border-b border-neutral-800">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <button
-                onClick={() => setActiveFilter('ALL')}
-                className={`px-3 py-1.5 uppercase font-bold text-[10px] rounded-xs transition-colors whitespace-nowrap cursor-pointer ${
-                  activeFilter === 'ALL'
-                    ? 'bg-white text-black'
-                    : 'bg-neutral-900 text-neutral-400 hover:text-white'
-                }`}
-              >
-                TUTTI ({photos.length})
-              </button>
+          <div className="flex flex-wrap items-center gap-2 pb-4 mb-4 border-b border-neutral-800">
+            <button
+              onClick={() => setActiveFilter('ALL')}
+              className={`px-3 py-1.5 uppercase font-bold text-[10px] rounded-xs transition-colors whitespace-nowrap cursor-pointer ${
+                activeFilter === 'ALL'
+                  ? 'bg-white text-black'
+                  : 'bg-neutral-900 text-neutral-400 hover:text-white'
+              }`}
+            >
+              TUTTI ({photos.length})
+            </button>
 
-              {groups.map((g) => {
-                const count = photos.filter((p) => p.group_id === g.id).length;
-                return (
-                  <div key={g.id} className="flex items-center">
+            {groups.map((g) => {
+              const count = photos.filter((p) => p.group_id === g.id).length;
+              return (
+                <div key={g.id} className="flex items-center">
+                  <button
+                    onClick={() => setActiveFilter(g.id)}
+                    className={`px-3 py-1.5 uppercase font-bold text-[10px] rounded-xs transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                      activeFilter === g.id
+                        ? 'bg-white text-black'
+                        : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {g.name} ({count})
+                  </button>
+                  {g.name !== 'GENERAL' && (
                     <button
-                      onClick={() => setActiveFilter(g.id)}
-                      className={`px-3 py-1.5 uppercase font-bold text-[10px] rounded-xs transition-colors whitespace-nowrap flex items-center gap-2 cursor-pointer ${
-                        activeFilter === g.id
-                          ? 'bg-white text-black'
-                          : 'bg-neutral-900 text-neutral-400 hover:text-white'
-                      }`}
+                      onClick={() => handleDeleteGroup(g.id, g.name)}
+                      className="text-neutral-600 hover:text-red-400 ml-1 p-1 cursor-pointer"
+                      title="Elimina Gruppo"
                     >
-                      {g.name} ({count})
+                      &times;
                     </button>
-                    {g.name !== 'GENERAL' && (
-                      <button
-                        onClick={() => handleDeleteGroup(g.id, g.name)}
-                        className="text-neutral-600 hover:text-red-400 ml-1 p-1 cursor-pointer"
-                        title="Elimina Gruppo"
-                      >
-                        &times;
-                      </button>
-                    )}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {loading ? (
+            <p className="text-neutral-500 uppercase py-12 flex items-center gap-2">
+              <Loader2 className="animate-spin" size={16} /> Caricamento archivio...
+            </p>
+          ) : filteredPhotos.length === 0 ? (
+            <p className="text-neutral-500 uppercase py-12">Nessuna foto trovata.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {filteredPhotos.map((photo) => {
+                const thumbnailSrc = getOptimizedUrl(photo.public_url, 500);
+
+                return (
+                  <div
+                    key={photo.id}
+                    className={`bg-neutral-900 border rounded-sm overflow-hidden flex flex-col justify-between transition-colors ${
+                      photo.is_cover ? 'border-emerald-500/80 ring-1 ring-emerald-500/50' : 'border-neutral-800'
+                    }`}
+                  >
+                    <div className="relative aspect-square bg-neutral-950 overflow-hidden">
+                      <img
+                        src={thumbnailSrc}
+                        alt={photo.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-contain p-2"
+                      />
+
+                      {/* BADGE COPERTINA */}
+                      {photo.is_cover && (
+                        <div className="absolute top-2 left-2 bg-emerald-500 text-black font-bold text-[9px] px-2 py-0.5 uppercase tracking-widest flex items-center gap-1 shadow-md">
+                          <Star size={10} className="fill-black" /> COPERTINA
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 border-t border-neutral-800 space-y-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="font-bold truncate text-white uppercase">
+                          {photo.title}
+                        </span>
+                        <button
+                          onClick={() => handleDeletePhoto(photo)}
+                          className="text-neutral-500 hover:text-red-400 transition-colors cursor-pointer"
+                          title="Elimina Foto"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+
+                      {/* PULSANTE SET COPERTINA */}
+                      {photo.group_id && (
+                        <button
+                          onClick={() => handleSetCover(photo)}
+                          disabled={photo.is_cover}
+                          className={`w-full py-1 px-2 text-[9px] font-bold uppercase rounded-xs transition-colors flex items-center justify-center gap-1 cursor-pointer ${
+                            photo.is_cover
+                              ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 cursor-default'
+                              : 'bg-neutral-950 hover:bg-neutral-800 text-neutral-400 border border-neutral-800'
+                          }`}
+                        >
+                          <Star size={10} className={photo.is_cover ? 'fill-emerald-400' : ''} />
+                          {photo.is_cover ? 'COPERTINA ATTIVA' : 'IMPOSTA COPERTINA'}
+                        </button>
+                      )}
+
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <Folder size={12} className="text-neutral-500 shrink-0" />
+                        <select
+                          value={photo.group_id || ''}
+                          onChange={(e) => handleUpdatePhotoGroup(photo.id, e.target.value)}
+                          className="w-full bg-neutral-950 border border-neutral-800 text-[10px] text-neutral-300 p-1 rounded-xs uppercase focus:outline-none"
+                        >
+                          {groups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                          <option value="">-- NESSUN GRUPPO --</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
-
-            {/* PULSANTE RIMESCOLA MANUALE */}
-            <button
-              onClick={handleReshuffle}
-              className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-[10px] uppercase rounded-xs transition-colors flex items-center gap-1.5 ml-auto cursor-pointer"
-              title="Mischia di nuovo l'intera galleria"
-            >
-              <Shuffle size={12} /> SUPER MISCHIA
-            </button>
-          </div>
-
-          {/* GALLERY GRID */}
-          {loading ? (
-            <p className="text-neutral-500 uppercase py-12 flex items-center gap-2">
-              <Loader2 className="animate-spin" size={16} /> Caricamento archivio in corso...
-            </p>
-          ) : poolSize === 0 ? (
-            <p className="text-neutral-500 uppercase py-12">Nessuna foto trovata in questo gruppo.</p>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {displayedPhotos.map((photo) => {
-                  const thumbnailSrc = getOptimizedUrl(photo.public_url, 500);
-
-                  return (
-                    <div
-                      key={photo.instanceId}
-                      className="bg-neutral-900 border border-neutral-800 rounded-sm overflow-hidden flex flex-col justify-between"
-                    >
-                      <div className="relative aspect-square bg-neutral-950 overflow-hidden">
-                        <img
-                          src={thumbnailSrc}
-                          alt={photo.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-contain p-2"
-                        />
-                      </div>
-
-                      <div className="p-3 border-t border-neutral-800 space-y-2">
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="font-bold truncate text-white uppercase">
-                            {photo.title}
-                          </span>
-                          <button
-                            onClick={() => handleDeletePhoto(photo)}
-                            className="text-neutral-500 hover:text-red-400 transition-colors cursor-pointer"
-                            title="Elimina Foto"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-
-                        {/* CAMBIA GRUPPO ALLA FOTO */}
-                        <div className="flex items-center gap-1.5 pt-1">
-                          <Folder size={12} className="text-neutral-500 shrink-0" />
-                          <select
-                            value={photo.group_id || ''}
-                            onChange={(e) => handleUpdatePhotoGroup(photo.id, e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-800 text-[10px] text-neutral-300 p-1 rounded-xs uppercase focus:outline-none"
-                          >
-                            {groups.map((g) => (
-                              <option key={g.id} value={g.id}>
-                                {g.name}
-                              </option>
-                            ))}
-                            <option value="">-- NESSUN GRUPPO --</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* SENTINELLA INFINITE SCROLL */}
-              <div
-                ref={observerTarget}
-                className="w-full py-8 text-center flex justify-center items-center text-neutral-500"
-              >
-                <div className="flex items-center gap-2">
-                  <Loader2 className="animate-spin" size={16} />
-                  <span className="uppercase text-[10px] tracking-wider">
-                    Generazione nuovo blocco casuale... ({displayedPhotos.length} foto caricate)
-                  </span>
-                </div>
-              </div>
-            </>
           )}
-
         </div>
-
       </div>
     </div>
   );

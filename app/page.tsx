@@ -37,9 +37,28 @@ export default function Home() {
   const [typedInit, setTypedInit] = useState("");
   const [typedHold, setTypedHold] = useState("");
 
-  // Fix Hydration
+  // Controllo Timestamp: resetta l'intro solo se sono trascorsi almeno 5 minuti (300.000 ms)
   useEffect(() => {
     setIsMounted(true);
+
+    if (typeof window !== 'undefined') {
+      const lastVisited = localStorage.getItem('home_last_visited');
+      const now = Date.now();
+      const FIVE_MINUTES_MS = 5 * 60 * 1000; // 5 minuti
+
+      if (lastVisited && now - parseInt(lastVisited, 10) < FIVE_MINUTES_MS) {
+        // Meno di 5 minuti fa -> Salta l'intro
+        setStage('active');
+        setTypedInit(textInit);
+        setTypedHold(textHold);
+      } else {
+        // Più di 5 minuti fa o prima visita -> Esegui l'animazione
+        setStage('init');
+      }
+
+      // Aggiorna il timestamp dell'ultima visita
+      localStorage.setItem('home_last_visited', now.toString());
+    }
   }, []);
 
   // 1. Fetch Foto e Shuffle
@@ -55,7 +74,7 @@ export default function Home() {
         const loadedPhotos = data as Photo[];
         setPhotos(loadedPhotos);
 
-        // Pre-caricamento di TUTTE le miniature ottimizzate nella RAM del browser
+        // Pre-caricamento di TUTTE le miniature nella RAM
         loadedPhotos.forEach((photo) => {
           const img = new Image();
           img.src = getOptimizedUrl(photo.public_url, 1000);
@@ -111,7 +130,7 @@ export default function Home() {
     }
   }, [stage, typedHold, isMounted]);
 
-  // 4. FASE 3: Reel Foto continuo (veloce e fluido)
+  // 4. FASE 3: Reel Foto continuo
   useEffect(() => {
     if (!isMounted || stage !== 'active' || photos.length === 0 || shuffledIndices.length === 0) return;
 
@@ -129,7 +148,7 @@ export default function Home() {
         }
         return nextPointer;
       });
-    }, 250); // Ritmo serrato e costante (250ms)
+    }, 250);
 
     return () => clearInterval(intervalId);
   }, [stage, photos.length, shuffledIndices.length, isMounted]);
@@ -243,7 +262,7 @@ export default function Home() {
               </a>
               {typedHold.length > 5 && (
                 <a 
-                  href="https://instagram.com" 
+                  href="https://www.instagram.com/edoardo_lacertosa/" 
                   target="_blank" 
                   rel="noreferrer" 
                   className={`ml-[1.5em] ${hoveredIndex === 1 ? 'swap' : ''}`}
@@ -268,7 +287,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* STAGE GALLERIA FOTO (Cambio Istantaneo a 60fps) */}
+      {/* STAGE GALLERIA FOTO */}
       <div 
         className="absolute inset-[0.5rem] flex items-center justify-center pointer-events-none z-10 bg-white"
         style={{ height: 'calc(100vh - 1rem)', width: 'calc(100vw - 1rem)' }}
