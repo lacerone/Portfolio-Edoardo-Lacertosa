@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sliders } from 'lucide-react';
+import { X } from 'lucide-react';
 import Link from 'next/link';
+import TitansGallery from './component/TitansGallery';
 
 interface ExifData {
   camera?: string;
@@ -32,12 +33,12 @@ interface Photo {
   is_cover?: boolean;
 }
 
-const GAP = 12;
+const GAP = 0;
 const TARGET_ROW_HEIGHT = 280;
 
 const supabase = createClient();
 
-function getOptimizedUrl(originalUrl: string, width: number = 1000) {
+function getOptimizedUrl(originalUrl: string, width: number = 1200) {
   if (!originalUrl) return '';
   if (originalUrl.includes('/storage/v1/object/public/')) {
     return originalUrl.replace(
@@ -160,8 +161,8 @@ function InteractiveReelRow({
   };
 
   return (
-    <div className="w-full h-full relative overflow-hidden bg-black flex items-center">
-      <div ref={trackRef} className="flex h-full w-max shrink-0 items-center will-change-transform">
+    <div className="w-full h-full relative overflow-hidden bg-white flex items-center m-0 p-0">
+      <div ref={trackRef} className="flex h-full w-max shrink-0 items-center will-change-transform m-0 p-0">
         {reelItems.map((group, idx) => {
           const itemKey = `reel-${group.id}-${idx}`;
 
@@ -175,22 +176,22 @@ function InteractiveReelRow({
             <div
               key={itemKey}
               onClick={() => handleCardClick(group, itemKey)}
-              className="relative h-full w-[70vw] sm:w-[45vw] md:w-[35vw] bg-neutral-900 shrink-0 group cursor-pointer overflow-hidden border-r border-black select-none flex items-center justify-center"
+              className="relative h-full w-[70vw] sm:w-[45vw] md:w-[35vw] bg-neutral-100 shrink-0 group cursor-pointer overflow-hidden border-0 select-none flex items-center justify-center m-0 p-0"
             >
               {cover && (
                 <img
                   src={getOptimizedUrl(cover.public_url, 1000)}
                   alt={group.name}
-                  className="w-full h-full object-cover object-center block transition-transform duration-700 ease-out group-hover:scale-105"
+                  className="w-full h-full object-cover object-center block transition-transform duration-700 ease-out group-hover:scale-105 m-0 p-0 border-0"
                 />
               )}
 
               <div
-                className={`absolute inset-0 bg-black/60 transition-opacity duration-300 flex items-center justify-center p-6 text-center text-white lebon-font uppercase ${
+                className={`absolute inset-0 bg-white/60 transition-opacity duration-300 flex items-center justify-center p-6 text-center text-black lebon-font uppercase ${
                   isMobileActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                 }`}
               >
-                <span className="text-base sm:text-2xl md:text-3xl font-bold tracking-widest leading-tight drop-shadow-md px-2">
+                <span className="text-base sm:text-2xl md:text-3xl font-bold tracking-widest leading-tight drop-shadow-sm px-2">
                   {group.name}
                 </span>
               </div>
@@ -304,7 +305,7 @@ export default function Portfolio() {
   }, [currentProjectPhotos, containerWidth, loadedRatios]);
 
   return (
-    <main className="h-[100dvh] w-screen bg-black text-white m-0 p-0 font-sans select-none overflow-hidden relative">
+    <main className="h-[100dvh] w-screen bg-white text-black m-0 p-0 font-sans select-none overflow-x-hidden relative">
       <style jsx global>{`
         @font-face {
           font-family: "FRANK LEBON Front";
@@ -318,211 +319,199 @@ export default function Portfolio() {
           font-family: "FRANK LEBON Front", sans-serif;
         }
 
+        *, *:before, *:after {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
         ::-webkit-scrollbar { display: none; }
+        
         html, body {
           scrollbar-width: none;
-          margin: 0; padding: 0; width: 100vw; height: 100dvh;
-          overflow: hidden; background: #000000;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100vw !important;
+          height: 100dvh !important;
+          overflow-x: hidden !important;
+          background: #ffffff !important;
         }
       `}</style>
 
-      {/* TASTO HOME MINIMALE */}
+      {/* Tasto home minimale */}
       {!selectedGroup && (
         <Link
           href="/"
           title="Torna alla Home"
           className="fixed top-5 left-5 z-50 p-2.5 flex items-center justify-center group cursor-pointer"
         >
-          <div className="w-2 h-2 rounded-full bg-white/70 group-hover:bg-white group-hover:scale-125 transition-all shadow-sm backdrop-blur-md" />
+          <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm backdrop-blur-md" />
         </Link>
       )}
 
-      {loading ? (
-        <div className="h-full w-full flex items-center justify-center text-[10px] lebon-font text-neutral-500 uppercase tracking-widest animate-pulse">
-          CARICAMENTO ARCHIVIO...
-        </div>
-      ) : (
-        <AnimatePresence mode="wait">
-          {!selectedGroup && (
-            <div key="index-reels" className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative bg-black">
-              {/* RIGA SUPERIORE: 50% DVH ESATTO */}
-              <motion.div
-                initial={{ y: 0, opacity: 1 }}
-                exit={{ y: '-50dvh', opacity: 0 }}
-                transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
-                className="h-[50dvh] flex-1 w-full overflow-hidden"
-              >
-                <InteractiveReelRow
-                  groups={shuffledGroupsRow1}
-                  photos={photos}
-                  direction={1}
-                  onSelectGroup={(g) => setSelectedGroup(g)}
-                />
-              </motion.div>
+      {/* Contenitore principale con fade‑in globale all'arrivo dei dati */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: loading ? 0 : 1 }}
+        transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+        className="h-full w-full"
+      >
+        {!loading && (
+          <AnimatePresence mode="wait">
+            {!selectedGroup ? (
+              <div key="index-reels" className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative bg-white m-0 p-0">
+                {/* Riga superiore con leggero ritardo */}
+                <motion.div
+                  initial={{ y: '-50dvh', opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: '-50dvh', opacity: 0 }}
+                  transition={{
+                    duration: 0.7,
+                    ease: [0.76, 0, 0.24, 1],
+                    delay: 0.1,
+                  }}
+                  className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0"
+                >
+                  <InteractiveReelRow
+                    groups={shuffledGroupsRow1}
+                    photos={photos}
+                    direction={1}
+                    onSelectGroup={(g) => setSelectedGroup(g)}
+                  />
+                </motion.div>
 
-              {/* RIGA INFERIORE: 50% DVH ESATTO */}
-              <motion.div
-                initial={{ y: 0, opacity: 1 }}
-                exit={{ y: '50dvh', opacity: 0 }}
-                transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
-                className="h-[50dvh] flex-1 w-full overflow-hidden"
-              >
-                <InteractiveReelRow
-                  groups={shuffledGroupsRow2}
-                  photos={photos}
-                  direction={-1}
-                  onSelectGroup={(g) => setSelectedGroup(g)}
+                {/* Riga inferiore con ritardo maggiore */}
+                <motion.div
+                  initial={{ y: '50dvh', opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: '50dvh', opacity: 0 }}
+                  transition={{
+                    duration: 0.7,
+                    ease: [0.76, 0, 0.24, 1],
+                    delay: 0.2,
+                  }}
+                  className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0"
+                >
+                  <InteractiveReelRow
+                    groups={shuffledGroupsRow2}
+                    photos={photos}
+                    direction={-1}
+                    onSelectGroup={(g) => setSelectedGroup(g)}
+                  />
+                </motion.div>
+              </div>
+            ) : (
+              // Progetto selezionato: se è "TITANS" usa il componente speciale, altrimenti la galleria standard
+              selectedGroup.name.toUpperCase() === 'TITANS' ? (
+                <TitansGallery
+                  group={selectedGroup}
+                  photos={currentProjectPhotos}
+                  onBack={() => setSelectedGroup(null)}
                 />
-              </motion.div>
-            </div>
-          )}
-
-          {selectedGroup && (
-            <motion.div
-              key="project-page"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-              className="h-full w-full overflow-y-auto pt-16 p-6 sm:p-12 bg-white text-black"
-            >
-              <div ref={containerRef} className="w-full max-w-7xl mx-auto">
-                <div className="mb-8 border-b border-neutral-200 pb-4 lebon-font uppercase flex justify-between items-end">
-                  <div>
+              ) : (
+                <motion.div
+                  key="project-page"
+                  initial={{ y: '100dvh', opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: '100dvh', opacity: 0 }}
+                  transition={{
+                    duration: 0.5,
+                    ease: [0.76, 0, 0.24, 1],
+                  }}
+                  className="fixed inset-0 z-50 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden bg-white text-black m-0 p-0"
+                >
+                  {/* Pulsante indietro (puntino) */}
+                  <header className="fixed top-5 left-5 z-50 bg-transparent">
                     <button
                       onClick={() => setSelectedGroup(null)}
-                      className="text-[10px] text-neutral-400 hover:text-black mb-2 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Torna indietro"
+                      className="p-2.5 flex items-center justify-center group cursor-pointer"
                     >
-                      &larr; TORNA AI PROGETTI
+                      <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm" />
                     </button>
-                    <h1 className="text-xl sm:text-3xl font-bold tracking-widest">
-                      {selectedGroup.name}
-                    </h1>
-                    {selectedGroup.description && (
-                      <p className="text-[11px] text-neutral-500 normal-case font-mono mt-1">
-                        {selectedGroup.description}
-                      </p>
+                  </header>
+
+                  <div ref={containerRef} className="w-screen max-w-none m-0 p-0 pt-16 flex flex-col items-center">
+                    {currentProjectPhotos.length === 0 ? (
+                      <div className="min-h-[50vh] flex items-center justify-center text-[10px] lebon-font text-neutral-400 uppercase tracking-widest">
+                        Nessuno scatto presente in questo progetto.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col w-screen max-w-[1920px] mx-auto m-0 p-0 pb-12 items-center" style={{ gap: `0px` }}>
+                        {layoutRows.map((row, rowIndex) => (
+                          <div
+                            key={`row-${rowIndex}`}
+                            className="flex w-full justify-center overflow-hidden m-0 p-0"
+                            style={{ gap: `0px`, height: `${row.height}px` }}
+                          >
+                            {row.items.map(({ photo, ratio }) => {
+                              const thumbnailSrc = getOptimizedUrl(photo.public_url, 1200);
+                              return (
+                                <div
+                                  key={photo.id}
+                                  onClick={() => setSelectedPhoto(photo)}
+                                  style={{
+                                    flexGrow: ratio,
+                                    flexShrink: 1,
+                                    flexBasis: '0px',
+                                    height: `${row.height}px`,
+                                    margin: 0,
+                                    padding: 0,
+                                    border: 'none',
+                                  }}
+                                  className="relative group cursor-pointer overflow-hidden bg-white shadow-none hover:z-20 transition-all duration-300 border-0 outline-none m-0 p-0 flex justify-center items-center"
+                                >
+                                  <img
+                                    src={thumbnailSrc}
+                                    alt={photo.title || 'Scatto'}
+                                    className="w-full h-full block object-cover transition-transform duration-500 ease-out group-hover:scale-105 m-0 p-0 border-0 mx-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                    onLoad={handleImgLoad(photo.id)}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <span className="text-[10px] text-neutral-400 font-mono tracking-widest">
-                    [{currentProjectPhotos.length} FRAMES]
-                  </span>
-                </div>
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
+        )}
+      </motion.div>
 
-                {currentProjectPhotos.length === 0 ? (
-                  <div className="min-h-[50vh] flex items-center justify-center text-[10px] lebon-font text-neutral-400 uppercase tracking-widest">
-                    Nessuno scatto presente in questo progetto.
-                  </div>
-                ) : (
-                  <div className="flex flex-col pb-12" style={{ gap: `${GAP}px` }}>
-                    {layoutRows.map((row, rowIndex) => (
-                      <div
-                        key={`row-${rowIndex}`}
-                        className="flex w-full overflow-hidden"
-                        style={{ gap: `${GAP}px`, height: `${row.height}px` }}
-                      >
-                        {row.items.map(({ photo, ratio }) => {
-                          const thumbnailSrc = getOptimizedUrl(photo.public_url, 800);
-
-                          return (
-                            <div
-                              key={photo.id}
-                              onClick={() => setSelectedPhoto(photo)}
-                              style={{
-                                flexGrow: ratio,
-                                flexShrink: 1,
-                                flexBasis: '0px',
-                                height: `${row.height}px`,
-                              }}
-                              className="relative group cursor-pointer overflow-hidden bg-neutral-100 shadow-xs hover:z-20 transition-all duration-300"
-                            >
-                              <img
-                                src={thumbnailSrc}
-                                alt={photo.title || 'Scatto'}
-                                className="w-full h-full block object-contain transition-transform duration-500 ease-out group-hover:scale-105"
-                                loading="lazy"
-                                decoding="async"
-                                onLoad={handleImgLoad(photo.id)}
-                              />
-
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4">
-                                <span className="text-white text-[11px] lebon-font uppercase tracking-widest">
-                                  {photo.title || 'INGRANDISCI'}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
-
-      {/* MODAL EXIF */}
+      {/* Modale EXIF */}
       <AnimatePresence>
         {selectedPhoto && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
             onClick={() => setSelectedPhoto(null)}
-            className="fixed inset-0 z-50 bg-white/98 backdrop-blur-2xl flex flex-col justify-between p-6 md:p-10 text-black lebon-font"
+            className="fixed inset-0 z-[100] bg-white backdrop-blur-xl flex items-center justify-center p-4 md:p-10 m-0"
           >
-            <div className="flex justify-between items-center text-xs border-b border-neutral-200 pb-3">
-              <span className="text-black font-bold text-[10px] uppercase">
-                {selectedGroup?.name} — {selectedPhoto.title || 'DETTAGLIO'}
-              </span>
-              <button
-                onClick={() => setSelectedPhoto(null)}
-                className="p-1.5 border border-neutral-200 text-neutral-600 hover:text-black transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
+            <button
+              onClick={() => setSelectedPhoto(null)}
+              className="absolute top-6 right-6 z-10 p-3 rounded-full bg-neutral-100 text-black hover:bg-neutral-200 transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
 
-            <div className="relative flex-1 my-4 flex items-center justify-center overflow-hidden">
-              <img
-                src={getOptimizedUrl(selectedPhoto.public_url, 1600)}
-                alt={selectedPhoto.title}
-                className="max-h-[75vh] max-w-full w-auto object-contain shadow-xl"
-              />
-            </div>
-
-            {selectedPhoto.exif_data && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="bg-neutral-100 border border-neutral-200 p-4 rounded-2xs max-w-xl mx-auto w-full text-[10px] text-neutral-700"
-              >
-                <div className="flex items-center gap-1.5 text-[9px] text-neutral-500 uppercase tracking-widest mb-2 font-bold border-b border-neutral-200 pb-1.5">
-                  <Sliders size={10} /> REGISTRO EXIF
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[9px]">
-                  <div>
-                    <span className="block text-neutral-400 uppercase">CAMERA</span>
-                    <span className="text-black font-bold">{selectedPhoto.exif_data.camera || '35MM'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-neutral-400 uppercase">LENS</span>
-                    <span className="text-black font-bold">{selectedPhoto.exif_data.lens || 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-neutral-400 uppercase">EXPOSURE</span>
-                    <span className="text-black font-bold">
-                      {selectedPhoto.exif_data.focal_length} {selectedPhoto.exif_data.aperture}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-neutral-400 uppercase">ISO</span>
-                    <span className="text-black font-bold">{selectedPhoto.exif_data.iso || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            <motion.img
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              src={getOptimizedUrl(selectedPhoto.public_url, 1600)}
+              alt={selectedPhoto.title}
+              className="max-h-[90vh] max-w-[95vw] object-contain shadow-2xl bg-white mx-auto"
+              onClick={(e) => e.stopPropagation()}
+            />
           </motion.div>
         )}
       </AnimatePresence>
