@@ -1,10 +1,10 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
-import { Upload, Trash2, Folder, Plus, Layers, Shuffle, Loader2 } from 'lucide-react';
+import { Upload, Trash2, Folder, Plus, Layers, Shuffle, Loader2, LogOut, Lock } from 'lucide-react';
 
 interface Group {
   id: string;
@@ -28,6 +28,18 @@ interface DisplayPhoto extends Photo {
 
 const BATCH_SIZE = 12; // Foto da aggiungere ad ogni ciclo di scroll
 
+// Ridimensiona e trasforma le miniature al volo per la griglia admin
+function getOptimizedUrl(originalUrl: string, width: number = 500) {
+  if (!originalUrl) return '';
+  if (originalUrl.includes('/storage/v1/object/public/')) {
+    return originalUrl.replace(
+      '/storage/v1/object/public/',
+      '/storage/v1/render/image/public/'
+    ) + `?width=${width}&quality=75&resize=contain`;
+  }
+  return originalUrl;
+}
+
 // Algoritmo di Fisher-Yates per mescolare l'array in modo veramente casuale
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
@@ -39,6 +51,16 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export default function AdminPage() {
+  const supabase = createClient();
+
+  // Stati per Auth (Supabase Authentication)
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Stati della pagina Admin
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +84,40 @@ export default function AdminPage() {
   // Ref per l'elemento sentinella dell'Infinite Scroll
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  const supabase = createClient();
+  // 1. Verifica della sessione di login
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setAuthLoading(false);
+    };
+
+    checkAuth();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setLoginError('Credenziali errate: ' + error.message);
+    }
+  };
+
+  // Logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
   // Funzione per generare un blocco di foto casuali dal pool filtrato
   const generateRandomBatch = useCallback((pool: Photo[], count: number): DisplayPhoto[] => {
@@ -73,7 +128,7 @@ export default function AdminPage() {
 
     while (batch.length < count) {
       if (currentDeck.length === 0) {
-        currentDeck = shuffleArray(pool); // Rimescola un nuovo mazzo quando finisce
+        currentDeck = shuffleArray(pool);
       }
       const photo = currentDeck.pop()!;
       batch.push({
@@ -85,7 +140,7 @@ export default function AdminPage() {
     return batch;
   }, []);
 
-  // Fetch dei dati iniziali da Supabase
+  // Fetch dei dati da Supabase (attivato solo se l'utente è loggato)
   const fetchData = async () => {
     setLoading(true);
 
@@ -110,7 +165,6 @@ export default function AdminPage() {
     if (photosData) {
       const rawPhotos = photosData as Photo[];
       setPhotos(rawPhotos);
-      // Inizializza il primo blocco di foto totalmente mischiato
       setDisplayedPhotos(generateRandomBatch(rawPhotos, BATCH_SIZE));
     }
 
@@ -118,8 +172,10 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   // Ottieni il pool di foto in base al filtro attivo
   const getFilteredPool = useCallback(() => {
@@ -130,9 +186,10 @@ export default function AdminPage() {
 
   // Quando cambia il filtro attivo, resetta e rimescola completamente il feed
   useEffect(() => {
+    if (!user) return;
     const pool = getFilteredPool();
     setDisplayedPhotos(generateRandomBatch(pool, BATCH_SIZE));
-  }, [activeFilter, getFilteredPool, generateRandomBatch]);
+  }, [activeFilter, getFilteredPool, generateRandomBatch, user]);
 
   // Funzione per caricare ALTRE foto mischiate quando si arriva in fondo
   const loadMorePhotos = useCallback(() => {
@@ -149,8 +206,9 @@ export default function AdminPage() {
     setDisplayedPhotos(generateRandomBatch(pool, BATCH_SIZE));
   };
 
-  // Intersection Observer per intercettare lo scroll verso il basso
+  // Intersection Observer per l'Infinite Scroll
   useEffect(() => {
+    if (!user) return;
     const target = observerTarget.current;
     if (!target) return;
 
@@ -168,7 +226,7 @@ export default function AdminPage() {
     return () => {
       observer.unobserve(target);
     };
-  }, [loadMorePhotos, loading]);
+  }, [loadMorePhotos, loading, user]);
 
   // 1. Crea Nuovo Gruppo
   const handleCreateGroup = async (e: React.FormEvent) => {
@@ -255,7 +313,6 @@ export default function AdminPage() {
       if (newPhoto) {
         const added = newPhoto as Photo;
         setPhotos((prev) => [added, ...prev]);
-        // Inserisce subito la nuova foto in cima al feed
         setDisplayedPhotos((prev) => [
           { ...added, instanceId: `${added.id}-${Date.now()}` },
           ...prev,
@@ -324,6 +381,67 @@ export default function AdminPage() {
 
   const poolSize = getFilteredPool().length;
 
+  // --- RENDER STATI DI AUTENTICAZIONE ---
+
+  // 1. Caricamento della sessione
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-neutral-400 font-mono text-xs flex items-center justify-center">
+        VERIFICA ACCESSO IN CORSO...
+      </div>
+    );
+  }
+
+  // 2. Schermata Login (se non autenticato)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-white font-mono text-xs flex items-center justify-center p-4 select-none">
+        <form onSubmit={handleLogin} className="bg-neutral-900 border border-neutral-800 p-6 rounded-xs w-full max-w-sm space-y-4">
+          <div className="flex items-center justify-center gap-2 border-b border-neutral-800 pb-3 mb-2">
+            <Lock size={16} className="text-neutral-400" />
+            <h1 className="font-bold text-xs uppercase tracking-widest text-center">ACCESSO RISERVATO</h1>
+          </div>
+
+          {loginError && (
+            <div className="p-2 bg-red-950/50 border border-red-800 text-red-400 text-[10px] rounded-xs">
+              {loginError}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-neutral-400 mb-1 uppercase text-[10px]">Email Admin</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-neutral-950 border border-neutral-800 p-2 text-white rounded-xs focus:outline-none"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-neutral-400 mb-1 uppercase text-[10px]">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-neutral-950 border border-neutral-800 p-2 text-white rounded-xs focus:outline-none"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-white text-black font-bold p-2.5 uppercase hover:bg-neutral-200 transition-colors cursor-pointer"
+          >
+            ENTRA NELL ARCHIVIO
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // 3. Schermata Admin completa (se autenticato)
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6 md:p-12 font-mono text-xs">
       
@@ -332,9 +450,17 @@ export default function AdminPage() {
         <h1 className="text-sm font-bold tracking-widest uppercase flex items-center gap-2">
           <Layers size={16} /> GESTORE ARCHIVIO & GRUPPI
         </h1>
-        <a href="/" className="text-neutral-400 hover:text-white transition-colors">
-          &larr; TORNA ALLA HOME
-        </a>
+        <div className="flex items-center gap-4">
+          <a href="/" className="text-neutral-400 hover:text-white transition-colors">
+            &larr; TORNA ALLA HOME
+          </a>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-1.5 text-red-400 hover:text-red-300 hover:border-red-900 transition-colors rounded-xs cursor-pointer uppercase"
+          >
+            <LogOut size={12} /> LOGOUT
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -498,6 +624,8 @@ export default function AdminPage() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {displayedPhotos.map((photo) => {
+                  const thumbnailSrc = getOptimizedUrl(photo.public_url, 500);
+
                   return (
                     <div
                       key={photo.instanceId}
@@ -505,9 +633,10 @@ export default function AdminPage() {
                     >
                       <div className="relative aspect-square bg-neutral-950 overflow-hidden">
                         <img
-                          src={photo.public_url}
+                          src={thumbnailSrc}
                           alt={photo.title}
                           loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-contain p-2"
                         />
                       </div>
@@ -548,7 +677,7 @@ export default function AdminPage() {
                 })}
               </div>
 
-              {/* SENTINELLA INFINITE SCROLL INFINITO E CASUALE */}
+              {/* SENTINELLA INFINITE SCROLL */}
               <div
                 ref={observerTarget}
                 className="w-full py-8 text-center flex justify-center items-center text-neutral-500"
