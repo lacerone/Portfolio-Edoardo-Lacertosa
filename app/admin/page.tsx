@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'; // <--- AGGIUNGI QUESTA RIGA
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
 import { Upload, Trash2, Folder, Plus, Layers, Shuffle, Loader2 } from 'lucide-react';
