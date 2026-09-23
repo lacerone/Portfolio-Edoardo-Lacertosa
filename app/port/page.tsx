@@ -101,7 +101,7 @@ const GalleryImage = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: isVisible ? 1 : 0 }}
       transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
-      className="relative overflow-hidden bg-white cursor-pointer group w-full flex justify-center px-4"
+      className="relative overflow-hidden bg-white cursor-pointer group w-full flex justify-center px-0 md:px-4"
       onClick={() => onSelect(photo)}
     >
       {isVisible && (
@@ -157,12 +157,10 @@ function StandardGalleryView({
         </button>
       </header>
 
-      {/* MODIFICA QUI: padding verticali ridotti su mobile (pt-24 pb-24) e normali su desktop (md:pt-48 md:pb-48) */}
       <main className="w-screen max-w-none m-0 p-0 pt-24 pb-24 md:pt-48 md:pb-48 overflow-x-hidden flex flex-col items-center bg-white">
-        <div className="w-full max-w-6xl mx-auto px-4 border-t border-white pt-6 md:pt-12 bg-white">
-          {/* MODIFICA QUI: gap ridotto su mobile (gap-6) e normale su desktop (md:gap-16) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-16 justify-center bg-white">
-            <div className="flex flex-col items-center gap-6 md:gap-16 w-full">
+        <div className="w-full max-w-6xl mx-auto px-1 md:px-4 border-t border-white pt-6 md:pt-12 bg-white">
+          <div className="grid grid-cols-2 gap-1 md:gap-16 justify-center bg-white">
+            <div className="flex flex-col items-center gap-1 md:gap-16 w-full">
               {col1.map((photo) => (
                 <GalleryImage
                   key={photo.id}
@@ -172,7 +170,7 @@ function StandardGalleryView({
                 />
               ))}
             </div>
-            <div className="flex flex-col items-center gap-6 md:gap-16 w-full">
+            <div className="flex flex-col items-center gap-1 md:gap-16 w-full">
               {col2.map((photo) => (
                 <GalleryImage
                   key={photo.id}
