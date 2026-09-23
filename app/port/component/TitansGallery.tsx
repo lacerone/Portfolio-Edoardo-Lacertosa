@@ -30,12 +30,11 @@ interface Group {
 
 function getOptimizedUrl(originalUrl: string, width: number = 1000) {
   if (!originalUrl) return '';
+  
   if (originalUrl.includes('/storage/v1/object/public/')) {
-    return originalUrl.replace(
-      '/storage/v1/object/public/',
-      `/storage/v1/render/image/public/`
-    ) + `?width=${width}&quality=85&resize=contain`;
+    return `https://wsrv.nl/?url=${encodeURIComponent(originalUrl)}&w=${width}&output=webp&q=85&fit=contain`;
   }
+  
   return originalUrl;
 }
 
