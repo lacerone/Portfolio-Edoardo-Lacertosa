@@ -14,8 +14,14 @@ interface Photo {
 function getOptimizedUrl(originalUrl: string, width: number = 1000) {
   if (!originalUrl) return '';
   
-  // Ritorna direttamente l'URL standard originale
-  return originalUrl;
+  // Assicuriamoci di usare il link pubblico standard di Supabase
+  const standardUrl = originalUrl.replace(
+    '/storage/v1/render/image/public/',
+    '/storage/v1/object/public/'
+  );
+
+  // Passiamo il link al proxy gratuito per il resize al volo
+  return `https://wsrv.nl/?url=${encodeURIComponent(standardUrl)}&w=${width}&output=webp&q=80&fit=contain`;
 }
 
 export default function Home() {
