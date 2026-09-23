@@ -13,12 +13,8 @@ interface Photo {
 // Ridimensiona e comprime le immagini al volo via Supabase Storage
 function getOptimizedUrl(originalUrl: string, width: number = 1000) {
   if (!originalUrl) return '';
-  if (originalUrl.includes('/storage/v1/object/public/')) {
-    return originalUrl.replace(
-      '/storage/v1/object/public/',
-      '/storage/v1/render/image/public/'
-    ) + `?width=${width}&quality=80&resize=contain`;
-  }
+  
+  // Ritorna direttamente l'URL standard originale
   return originalUrl;
 }
 
