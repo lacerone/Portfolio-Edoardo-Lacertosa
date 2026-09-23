@@ -26,12 +26,11 @@ const supabase = createClient();
 
 function getOptimizedUrl(originalUrl: string, width: number = 500) {
   if (!originalUrl) return '';
+  
   if (originalUrl.includes('/storage/v1/object/public/')) {
-    return originalUrl.replace(
-      '/storage/v1/object/public/',
-      '/storage/v1/render/image/public/'
-    ) + `?width=${width}&quality=75&resize=contain`;
+    return `https://wsrv.nl/?url=${encodeURIComponent(originalUrl)}&w=${width}&output=webp&q=75&fit=contain`;
   }
+  
   return originalUrl;
 }
 
