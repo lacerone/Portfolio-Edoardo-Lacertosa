@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sliders } from 'lucide-react';
+import { X } from 'lucide-react';
 import Link from 'next/link';
 
 interface ExifData {
@@ -36,11 +36,9 @@ const supabase = createClient();
 
 function getOptimizedUrl(originalUrl: string, width: number = 1000) {
   if (!originalUrl) return '';
-  
   if (originalUrl.includes('/storage/v1/object/public/')) {
     return `https://wsrv.nl/?url=${encodeURIComponent(originalUrl)}&w=${width}&output=webp&q=85&fit=contain`;
   }
-  
   return originalUrl;
 }
 
@@ -101,7 +99,7 @@ const GalleryImage = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: isVisible ? 1 : 0 }}
       transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
-      className="relative overflow-hidden bg-white cursor-pointer group w-full flex justify-center px-4"
+      className="relative overflow-hidden bg-white cursor-pointer group w-full flex justify-center px-2 md:px-4"
       onClick={() => onSelect(photo)}
     >
       {isVisible && (
@@ -147,20 +145,20 @@ function StandardGalleryView({
       transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
       className="fixed inset-0 z-50 w-screen h-screen bg-white text-black overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white m-0 p-0"
     >
-      <header className="fixed top-5 left-5 z-50 bg-transparent">
+      <header className="fixed top-4 left-4 md:top-5 md:left-5 z-50 bg-transparent">
         <button
           onClick={onBack}
           title="Torna alla Home"
-          className="p-2.5 flex items-center justify-center group cursor-pointer"
+          className="p-4 md:p-2.5 flex items-center justify-center group cursor-pointer"
         >
-          <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm" />
+          <div className="w-2.5 h-2.5 md:w-2 md:h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm" />
         </button>
       </header>
 
-      <main className="w-screen max-w-none m-0 p-0 pt-48 pb-48 overflow-x-hidden flex flex-col items-center bg-white">
-        <div className="w-full max-w-6xl mx-auto px-4 border-t border-white pt-12 bg-white">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 justify-center bg-white">
-            <div className="flex flex-col items-center gap-12 md:gap-16 w-full">
+      <main className="w-screen max-w-none m-0 p-0 pt-24 pb-24 md:pt-48 md:pb-48 overflow-x-hidden flex flex-col items-center bg-white">
+        <div className="w-full max-w-6xl mx-auto px-2 md:px-4 border-t border-white pt-6 md:pt-12 bg-white">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 justify-center bg-white">
+            <div className="flex flex-col items-center gap-8 md:gap-16 w-full">
               {col1.map((photo) => (
                 <GalleryImage
                   key={photo.id}
@@ -170,7 +168,7 @@ function StandardGalleryView({
                 />
               ))}
             </div>
-            <div className="flex flex-col items-center gap-12 md:gap-16 w-full">
+            <div className="flex flex-col items-center gap-8 md:gap-16 w-full">
               {col2.map((photo) => (
                 <GalleryImage
                   key={photo.id}
@@ -300,7 +298,7 @@ function InteractiveReelRow({
             <div
               key={itemKey}
               onClick={() => handleCardClick(group, itemKey)}
-              className="relative h-full w-[70vw] sm:w-[45vw] md:w-[35vw] bg-neutral-100 shrink-0 group cursor-pointer overflow-hidden border-0 select-none flex items-center justify-center m-0 p-0"
+              className="relative h-full w-[85vw] sm:w-[50vw] md:w-[35vw] bg-neutral-100 shrink-0 group cursor-pointer overflow-hidden border-0 select-none flex items-center justify-center m-0 p-0"
             >
               {cover && (
                 <img
@@ -315,7 +313,7 @@ function InteractiveReelRow({
                   isMobileActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                 }`}
               >
-                <span className="text-base sm:text-2xl md:text-3xl font-bold tracking-widest leading-tight drop-shadow-sm px-2">
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold tracking-widest leading-tight drop-shadow-sm px-2">
                   {group.name}
                 </span>
               </div>
@@ -363,7 +361,7 @@ export default function Portfolio() {
     <main className="h-[100dvh] w-screen bg-white text-black m-0 p-0 font-sans select-none overflow-x-hidden relative">
       <style jsx global>{`
         @font-face {
-          font-family: "FRANK LEBON Front";
+          font-family: "FRANK LE গঠন Front";
           src: url("/fonts/FRANKLEBON-Front.woff2") format("woff2");
           font-weight: normal;
           font-style: normal;
@@ -393,14 +391,13 @@ export default function Portfolio() {
         }
       `}</style>
 
-      {/* TASTO HOME MINIMALE */}
       {!selectedGroup && (
         <Link
           href="/"
           title="Torna alla Home"
-          className="fixed top-5 left-5 z-50 p-2.5 flex items-center justify-center group cursor-pointer"
+          className="fixed top-4 left-4 md:top-5 md:left-5 z-50 p-4 md:p-2.5 flex items-center justify-center group cursor-pointer"
         >
-          <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm backdrop-blur-md" />
+          <div className="w-2.5 h-2.5 md:w-2 md:h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm backdrop-blur-md" />
         </Link>
       )}
 
@@ -414,7 +411,6 @@ export default function Portfolio() {
             transition={{ duration: 0.4 }}
             className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative bg-white m-0 p-0"
           >
-            {/* RIGA SUPERIORE: 50% DVH ESATTO */}
             <div className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0">
               <InteractiveReelRow
                 groups={shuffledGroupsRow1}
@@ -423,8 +419,6 @@ export default function Portfolio() {
                 onSelectGroup={(g) => setSelectedGroup(g)}
               />
             </div>
-
-            {/* RIGA INFERIORE: 50% DVH ESATTO */}
             <div className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0">
               <InteractiveReelRow
                 groups={shuffledGroupsRow2}
@@ -436,7 +430,6 @@ export default function Portfolio() {
           </motion.div>
         )}
 
-        {/* RENDERING CONDIZIONALE DEL PROGETTO SELEZIONATO - TUTTE LE GALLERIE UGUALI */}
         {selectedGroup && (
           <StandardGalleryView
             group={selectedGroup}
@@ -447,7 +440,6 @@ export default function Portfolio() {
         )}
       </AnimatePresence>
 
-      {/* MODAL EXIF */}
       <AnimatePresence>
         {selectedPhoto && (
           <motion.div
@@ -460,7 +452,7 @@ export default function Portfolio() {
           >
             <button
               onClick={() => setSelectedPhoto(null)}
-              className="absolute top-6 right-6 z-10 p-3 rounded-full bg-neutral-100 text-black hover:bg-neutral-200 transition-colors cursor-pointer"
+              className="absolute top-4 right-4 md:top-6 md:right-6 z-10 p-3 rounded-full bg-neutral-100/90 text-black hover:bg-neutral-200 transition-colors cursor-pointer shadow-sm"
             >
               <X size={20} />
             </button>
