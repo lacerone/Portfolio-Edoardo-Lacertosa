@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sliders } from 'lucide-react';
+import { X, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 interface ExifData {
@@ -147,13 +147,14 @@ function StandardGalleryView({
       transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
       className="fixed inset-0 z-50 w-screen h-screen bg-white text-black overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white m-0 p-0"
     >
-      <header className="fixed top-5 left-5 z-50 bg-transparent">
+      {/* PULSANTE TORNA INDIETRO ELEGANTE E FUNZIONALE */}
+      <header className="fixed top-6 left-6 z-50 bg-transparent">
         <button
           onClick={onBack}
-          title="Torna alla Home"
-          className="p-2.5 flex items-center justify-center group cursor-pointer"
+          className="group inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-neutral-100/80 hover:bg-black text-neutral-800 hover:text-white backdrop-blur-md transition-all duration-300 shadow-sm cursor-pointer border border-neutral-200/60 hover:border-black"
         >
-          <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm" />
+          <ArrowLeft className="w-4 h-4 transition-transform duration-300 group-hover:-translate-x-1" />
+          <span className="text-xs font-medium tracking-wide uppercase">Torna indietro</span>
         </button>
       </header>
 
@@ -436,7 +437,7 @@ export default function Portfolio() {
           </motion.div>
         )}
 
-        {/* RENDERING CONDIZIONALE DEL PROGETTO SELEZIONATO - TUTTE LE GALLERIE UGUALI */}
+        {/* RENDERING CONDIZIONALE DEL PROGETTO SELEZIONATO */}
         {selectedGroup && (
           <StandardGalleryView
             group={selectedGroup}
