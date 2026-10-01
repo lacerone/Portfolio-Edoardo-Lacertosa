@@ -147,14 +147,14 @@ function StandardGalleryView({
       transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
       className="fixed inset-0 z-50 w-screen h-screen bg-white text-black overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white m-0 p-0"
     >
-      {/* PULSANTE FRECCIA IN GALLERIA */}
+      {/* FRECCIA MINIMAL IN GALLERIA */}
       <header className="fixed top-6 left-6 z-50 bg-transparent">
         <button
           onClick={onBack}
           title="Torna indietro"
-          className="p-3 flex items-center justify-center rounded-full bg-neutral-100 text-neutral-800 shadow-sm cursor-pointer border border-neutral-200"
+          className="p-2 flex items-center justify-center text-neutral-800 hover:text-black transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
         >
-          <ArrowLeft className="w-6 h-6" />
+          <ArrowLeft className="w-7 h-7 stroke-[1.5]" />
         </button>
       </header>
 
@@ -394,15 +394,15 @@ export default function Portfolio() {
         }
       `}</style>
 
-      {/* TASTO FRECCIA NELLA SCHERMATA PRINCIPALE (REEL) */}
+      {/* FRECCIA MINIMAL NELLA SCHERMATA PRINCIPALE (REEL) */}
       {!selectedGroup && (
         <div className="fixed top-6 left-6 z-50">
           <Link
             href="/"
             title="Torna alla Home"
-            className="p-3 flex items-center justify-center rounded-full bg-neutral-100 text-neutral-800 shadow-sm cursor-pointer border border-neutral-200"
+            className="p-2 flex items-center justify-center text-neutral-800 hover:text-black transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-7 h-7 stroke-[1.5]" />
           </Link>
         </div>
       )}
