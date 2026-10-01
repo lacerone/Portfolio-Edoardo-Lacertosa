@@ -134,9 +134,14 @@ function StandardGalleryView({
 }) {
   const col1: Photo[] = [];
   const col2: Photo[] = [];
+  
+  // Distribuzione perfettamente bilanciata a turni (alternata)
   photos.forEach((photo, i) => {
-    if (i % 2 === 0) col1.push(photo);
-    else col2.push(photo);
+    if (i % 2 === 0) {
+      col1.push(photo);
+    } else {
+      col2.push(photo);
+    }
   });
 
   return (
@@ -399,7 +404,7 @@ export default function Portfolio() {
         <div className="fixed top-6 left-6 z-50">
           <Link
             href="/"
-            title="Torna alla Home"
+            title="Torna indietro"
             className="p-2 flex items-center justify-center text-neutral-800 hover:text-black transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
           >
             <ArrowLeft className="w-7 h-7 stroke-[1.5]" />
