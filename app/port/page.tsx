@@ -147,14 +147,14 @@ function StandardGalleryView({
       transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
       className="fixed inset-0 z-50 w-screen h-screen bg-white text-black overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white m-0 p-0"
     >
-      {/* PULSANTE TORNA INDIETRO ELEGANTE E FUNZIONALE */}
+      {/* PULSANTE CON LA SOLA FRECCIA PIÙ GRANDE ED ELEGANTE */}
       <header className="fixed top-6 left-6 z-50 bg-transparent">
         <button
           onClick={onBack}
-          className="group inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-neutral-100/80 hover:bg-black text-neutral-800 hover:text-white backdrop-blur-md transition-all duration-300 shadow-sm cursor-pointer border border-neutral-200/60 hover:border-black"
+          title="Torna alla Home"
+          className="p-3 flex items-center justify-center rounded-full bg-neutral-100/80 hover:bg-black text-neutral-800 hover:text-white backdrop-blur-md transition-all duration-300 shadow-sm cursor-pointer border border-neutral-200/60 hover:border-black group"
         >
-          <ArrowLeft className="w-4 h-4 transition-transform duration-300 group-hover:-translate-x-1" />
-          <span className="text-xs font-medium tracking-wide uppercase">Torna indietro</span>
+          <ArrowLeft className="w-6 h-6 transition-transform duration-300 group-hover:-translate-x-1" />
         </button>
       </header>
 
