@@ -147,14 +147,14 @@ function StandardGalleryView({
       transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
       className="fixed inset-0 z-50 w-screen h-screen bg-white text-black overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white m-0 p-0"
     >
-      {/* PULSANTE CON LA SOLA FRECCIA PIÙ GRANDE ED ELEGANTE */}
+      {/* PULSANTE FRECCIA IN GALLERIA */}
       <header className="fixed top-6 left-6 z-50 bg-transparent">
         <button
           onClick={onBack}
-          title="Torna alla Home"
-          className="p-3 flex items-center justify-center rounded-full bg-neutral-100/80 hover:bg-black text-neutral-800 hover:text-white backdrop-blur-md transition-all duration-300 shadow-sm cursor-pointer border border-neutral-200/60 hover:border-black group"
+          title="Torna indietro"
+          className="p-3 flex items-center justify-center rounded-full bg-neutral-100 text-neutral-800 shadow-sm cursor-pointer border border-neutral-200"
         >
-          <ArrowLeft className="w-6 h-6 transition-transform duration-300 group-hover:-translate-x-1" />
+          <ArrowLeft className="w-6 h-6" />
         </button>
       </header>
 
@@ -394,15 +394,17 @@ export default function Portfolio() {
         }
       `}</style>
 
-      {/* TASTO HOME MINIMALE */}
+      {/* TASTO FRECCIA NELLA SCHERMATA PRINCIPALE (REEL) */}
       {!selectedGroup && (
-        <Link
-          href="/"
-          title="Torna alla Home"
-          className="fixed top-5 left-5 z-50 p-2.5 flex items-center justify-center group cursor-pointer"
-        >
-          <div className="w-2 h-2 rounded-full bg-black/70 group-hover:bg-black group-hover:scale-125 transition-all shadow-sm backdrop-blur-md" />
-        </Link>
+        <div className="fixed top-6 left-6 z-50">
+          <Link
+            href="/"
+            title="Torna alla Home"
+            className="p-3 flex items-center justify-center rounded-full bg-neutral-100 text-neutral-800 shadow-sm cursor-pointer border border-neutral-200"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
+        </div>
       )}
 
       <AnimatePresence mode="wait">
