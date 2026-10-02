@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
 interface InfoModalProps {
@@ -97,8 +97,7 @@ export default function InfoModal({ onClose }: InfoModalProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // IL TUO NUMERO DI TELEFONO
-  const phoneNumber = '+39 3398773214';
+  const phoneNumber = '+39 339 877 3214';
 
   const handleCopyPhone = () => {
     navigator.clipboard.writeText(phoneNumber);
@@ -106,7 +105,6 @@ export default function InfoModal({ onClose }: InfoModalProps) {
     setTimeout(() => setCopied(false), 3000);
   };
 
-  // STATI DI CARICAMENTO FOTO
   const [img1Loaded, setImg1Loaded] = useState(false);
   const [img2Loaded, setImg2Loaded] = useState(false);
   const [img3Loaded, setImg3Loaded] = useState(false);
@@ -178,9 +176,9 @@ export default function InfoModal({ onClose }: InfoModalProps) {
 
   const BASE_DELAY = 0.4;
 
-  const drawVariant = {
+  const drawVariant: Variants = {
     hidden: { pathLength: 0, opacity: 0 },
-    visible: (delay: number) => ({
+    visible: (delay: number = 0) => ({
       pathLength: 1,
       opacity: 1,
       transition: {
