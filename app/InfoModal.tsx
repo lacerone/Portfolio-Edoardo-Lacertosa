@@ -8,7 +8,7 @@ interface InfoModalProps {
   onClose: () => void;
 }
 
-// CONFIGURAZIONE DEFINITIVA FOTO 2 - PC (NON TOCCATA)
+// CONFIGURAZIONE DEFINITIVA FOTO 2 - PC
 const circles2ConfigPC = [
   { id: 'c3', cx: 32, cy: 87, r: 24, color: 'stroke-cyan-400' },
   { id: 'c4', cx: 212, cy: 55, r: 28, color: 'stroke-emerald-400' },
@@ -17,7 +17,7 @@ const circles2ConfigPC = [
   { id: 'c7', cx: 222, cy: 159, r: 35, color: 'stroke-violet-500' },
 ];
 
-// CONFIGURAZIONE FOTO 2 - MOBILE (RICALIBRATA PER SMARTPHONE)
+// CONFIGURAZIONE FOTO 2 - MOBILE
 const circles2ConfigMobile = [
   { id: 'c3', cx: 38, cy: 87, r: 22, color: 'stroke-cyan-400' },
   { id: 'c4', cx: 206, cy: 58, r: 26, color: 'stroke-emerald-400' },
@@ -95,6 +95,21 @@ function generatePencilLine(x1: number, y1: number, x2: number, y2: number) {
 
 export default function InfoModal({ onClose }: InfoModalProps) {
   const [isMobile, setIsMobile] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // IL TUO NUMERO DI TELEFONO
+  const phoneNumber = '+39 3398773214';
+
+  const handleCopyPhone = () => {
+    navigator.clipboard.writeText(phoneNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  // STATI DI CARICAMENTO FOTO
+  const [img1Loaded, setImg1Loaded] = useState(false);
+  const [img2Loaded, setImg2Loaded] = useState(false);
+  const [img3Loaded, setImg3Loaded] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -105,7 +120,6 @@ export default function InfoModal({ onClose }: InfoModalProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // COORDINATE FRECCIA SEZIONE 1 (SOLO MOBILE CAMBIA, PC INVARIATO)
   const arrowConfig = isMobile
     ? { start: { x: 210, y: 320 }, control: { x: 245, y: 385 }, end: { x: 170, y: 430 } }
     : { start: { x: 205, y: 115 }, control: { x: 254, y: 38 }, end: { x: 348, y: 19 } };
@@ -144,7 +158,6 @@ export default function InfoModal({ onClose }: InfoModalProps) {
     ]);
   }, [isMobile]);
 
-  // CALCOLO DIREZIONE PUNTA DELLA FRECCIA
   const dx = end.x - control.x;
   const dy = end.y - control.y;
   const angle = Math.atan2(dy, dx);
@@ -163,17 +176,21 @@ export default function InfoModal({ onClose }: InfoModalProps) {
   const mainPath = `M ${start.x} ${start.y} Q ${control.x} ${control.y}, ${end.x} ${end.y}`;
   const headPath = `M ${end.x} ${end.y} L ${headLeft.x} ${headLeft.y} M ${end.x} ${end.y} L ${headRight.x} ${headRight.y}`;
 
+  const BASE_DELAY = 0.4;
+
   const drawVariant = {
     hidden: { pathLength: 0, opacity: 0 },
     visible: (delay: number) => ({
       pathLength: 1,
       opacity: 1,
       transition: {
-        pathLength: { delay, duration: 0.7, ease: 'easeOut' },
-        opacity: { delay, duration: 0.1 },
+        pathLength: { delay: BASE_DELAY + delay, duration: 0.7, ease: 'easeOut' },
+        opacity: { delay: BASE_DELAY + delay, duration: 0.1 },
       },
     }),
   };
+
+  const viewportConfig = { once: true, amount: 0.2 };
 
   return (
     <motion.div
@@ -224,7 +241,7 @@ export default function InfoModal({ onClose }: InfoModalProps) {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={viewportConfig}
           transition={{ duration: 0.6 }}
           className="flex flex-col md:flex-row items-center md:items-start justify-between gap-8 md:gap-16"
         >
@@ -232,49 +249,55 @@ export default function InfoModal({ onClose }: InfoModalProps) {
             <img
               src="/me.jpg"
               alt="Edoardo Lacertosa"
+              onLoad={() => setImg1Loaded(true)}
               className="w-full h-full object-cover rounded-3xl grayscale shadow-sm border border-neutral-100"
             />
 
-            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible fill-none" viewBox="0 0 300 400">
-              <motion.path
-                d={mainPath}
-                className="stroke-black"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                filter="url(#real-pencil-filter)"
-                variants={drawVariant}
-                initial="hidden"
-                animate="visible"
-                custom={0.95}
-              />
-              <motion.path
-                d={headPath}
-                className="stroke-black"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                filter="url(#real-pencil-filter)"
-                variants={drawVariant}
-                initial="hidden"
-                animate="visible"
-                custom={1.25}
-              />
-
-              {circle1Path && (
+            {img1Loaded && (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible fill-none" viewBox="0 0 300 400">
                 <motion.path
-                  d={circle1Path}
-                  className="stroke-red-600"
-                  strokeWidth="2.8"
+                  d={mainPath}
+                  className="stroke-black"
+                  strokeWidth="2.4"
                   strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="180 3 90 2"
                   filter="url(#real-pencil-filter)"
                   variants={drawVariant}
                   initial="hidden"
-                  animate="visible"
-                  custom={1.5}
+                  whileInView="visible"
+                  viewport={viewportConfig}
+                  custom={0.2}
                 />
-              )}
-            </svg>
+                <motion.path
+                  d={headPath}
+                  className="stroke-black"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  filter="url(#real-pencil-filter)"
+                  variants={drawVariant}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={viewportConfig}
+                  custom={0.5}
+                />
+
+                {circle1Path && (
+                  <motion.path
+                    d={circle1Path}
+                    className="stroke-red-600"
+                    strokeWidth="2.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="180 3 90 2"
+                    filter="url(#real-pencil-filter)"
+                    variants={drawVariant}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={viewportConfig}
+                    custom={0.8}
+                  />
+                )}
+              </svg>
+            )}
           </div>
 
           <div className="flex-1 space-y-3 text-left md:-mt-2 w-full">
@@ -282,7 +305,11 @@ export default function InfoModal({ onClose }: InfoModalProps) {
               CHI SONO
             </h2>
             <p style={{ fontFamily: "'GeneralSans', sans-serif" }} className="text-neutral-700 leading-relaxed text-base sm:text-lg font-normal">
-              Studente di Ingegneria Informatica con la testa costantemente nel visual. Fotografo e videomaker con base a Torino, unisco il rigore della composizione con la spontaneità dell'imperfezione analogica.
+              Ciao! mi chiamo Edoardo ho 20 anni.<br />
+              Nella vita studio informatica al PoliTo, e si!<br />
+              Questo sito è interamente farina del mio sacco.<br />
+              Rappresenta la mia crescita dal punto di vista fotografico e di web developer!<br />
+              Un luogo che racconta molto bene chi sono tramite quello che più mi piace fare.
             </p>
           </div>
         </motion.div>
@@ -291,7 +318,7 @@ export default function InfoModal({ onClose }: InfoModalProps) {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={viewportConfig}
           transition={{ duration: 0.6 }}
           className="flex flex-col-reverse md:flex-row items-center justify-between gap-8 md:gap-16"
         >
@@ -300,7 +327,9 @@ export default function InfoModal({ onClose }: InfoModalProps) {
               COME LAVORO
             </h2>
             <p style={{ fontFamily: "'GeneralSans', sans-serif" }} className="text-neutral-700 leading-relaxed text-base sm:text-lg font-normal">
-              Niente pose costruite o set rigidi. Lavoro sul campo integrandomi nel contesto con discrezione, trovando la luce giusta ed esaltando la materia originale della scena tra reportage e ricerca estetica.
+              Sempre propenso ad imparare, non metto mai le mie competenze sopra quelle dei miei collaboratori.<br />
+              Ho il fine di fare un lavoro al massimo delle mie possibilità, non di passare le ore prestabilite o portare a casa il lavoro.<br />
+              Ma di imparare e crescere, per portarmi a casa un sd piena di foto di cui essere fiero e non solo per le quali essere pagato.
             </p>
           </div>
 
@@ -308,28 +337,31 @@ export default function InfoModal({ onClose }: InfoModalProps) {
             <img
               src="/work.jpg"
               alt="Come lavoro"
+              onLoad={() => setImg2Loaded(true)}
               className="w-full h-full object-cover rounded-3xl grayscale"
             />
 
-            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible fill-none" viewBox="0 0 300 220">
-              {circles2Data.map((item, idx) => (
-                <motion.path
-                  key={item.id}
-                  d={item.path}
-                  className={item.color}
-                  strokeWidth="2.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="180 3 90 2"
-                  filter="url(#real-pencil-filter)"
-                  variants={drawVariant}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true }}
-                  custom={0.2 + idx * 0.22}
-                />
-              ))}
-            </svg>
+            {img2Loaded && (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible fill-none" viewBox="0 0 300 220">
+                {circles2Data.map((item, idx) => (
+                  <motion.path
+                    key={item.id}
+                    d={item.path}
+                    className={item.color}
+                    strokeWidth="2.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="180 3 90 2"
+                    filter="url(#real-pencil-filter)"
+                    variants={drawVariant}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={viewportConfig}
+                    custom={0.2 + idx * 0.22}
+                  />
+                ))}
+              </svg>
+            )}
           </div>
         </motion.div>
 
@@ -337,7 +369,7 @@ export default function InfoModal({ onClose }: InfoModalProps) {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={viewportConfig}
           transition={{ duration: 0.6 }}
           className="flex flex-col md:flex-row items-center justify-between gap-8 md:gap-16"
         >
@@ -345,60 +377,60 @@ export default function InfoModal({ onClose }: InfoModalProps) {
             <img
               src="/cercare.jpg"
               alt="Cosa cerco"
+              onLoad={() => setImg3Loaded(true)}
               className="w-full h-full object-cover rounded-3xl grayscale"
             />
 
-            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible fill-none" viewBox="0 0 300 220">
-              {/* Cerchio del mirino */}
-              {mirinoCirclePath && (
-                <motion.path
-                  d={mirinoCirclePath}
-                  className="stroke-red-600"
-                  strokeWidth="2.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="180 3 90 2"
-                  filter="url(#real-pencil-filter)"
-                  variants={drawVariant}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true }}
-                  custom={0.2}
-                />
-              )}
+            {img3Loaded && (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible fill-none" viewBox="0 0 300 220">
+                {mirinoCirclePath && (
+                  <motion.path
+                    d={mirinoCirclePath}
+                    className="stroke-red-600"
+                    strokeWidth="2.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="180 3 90 2"
+                    filter="url(#real-pencil-filter)"
+                    variants={drawVariant}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={viewportConfig}
+                    custom={0.2}
+                  />
+                )}
 
-              {/* Punto centrale animato */}
-              <motion.circle
-                cx={mirinoConfig.cx}
-                cy={mirinoConfig.cy}
-                r="3"
-                className="fill-red-600 stroke-red-600"
-                filter="url(#real-pencil-filter)"
-                initial={{ scale: 0, opacity: 0 }}
-                whileInView={{ scale: [0, 1.4, 1], opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.5, duration: 0.3, ease: 'easeOut' }}
-              />
-
-              {/* 4 Stanghette esterne */}
-              {mirinoArms.map((armD, idx) => (
-                <motion.path
-                  key={idx}
-                  d={armD}
-                  className="stroke-red-600"
-                  strokeWidth="2.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="180 3 90 2"
+                <motion.circle
+                  cx={mirinoConfig.cx}
+                  cy={mirinoConfig.cy}
+                  r="3"
+                  className="fill-red-600 stroke-red-600"
                   filter="url(#real-pencil-filter)"
-                  variants={drawVariant}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true }}
-                  custom={0.7 + idx * 0.15}
+                  initial={{ scale: 0, opacity: 0 }}
+                  whileInView={{ scale: [0, 1.4, 1], opacity: 1 }}
+                  viewport={viewportConfig}
+                  transition={{ delay: BASE_DELAY + 0.5, duration: 0.3, ease: 'easeOut' }}
                 />
-              ))}
-            </svg>
+
+                {mirinoArms.map((armD, idx) => (
+                  <motion.path
+                    key={idx}
+                    d={armD}
+                    className="stroke-red-600"
+                    strokeWidth="2.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="180 3 90 2"
+                    filter="url(#real-pencil-filter)"
+                    variants={drawVariant}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={viewportConfig}
+                    custom={0.7 + idx * 0.15}
+                  />
+                ))}
+              </svg>
+            )}
           </div>
 
           <div className="flex-1 space-y-3 text-left w-full">
@@ -406,16 +438,17 @@ export default function InfoModal({ onClose }: InfoModalProps) {
               COSA CERCO
             </h2>
             <p style={{ fontFamily: "'GeneralSans', sans-serif" }} className="text-neutral-700 leading-relaxed text-base sm:text-lg font-normal">
-              Progetti editoriali, coperture eventi, brand indipendenti e collaborazioni con artisti o realtà creative che vogliono raccontare storie autentiche senza filtri convenzionali.
+              Sono in cerca di progetti stimolanti.<br />
+              Che mi permettano di fare un salto nel mondo della fotografia.
             </p>
             <div className="pt-2 sm:pt-4">
-              <a
-                href="mailto:contact@example.com"
+              <button
+                onClick={handleCopyPhone}
                 style={{ fontFamily: "'GeneralSans', sans-serif" }}
-                className="inline-block text-sm font-semibold uppercase tracking-wider text-black underline underline-offset-4 decoration-red-500 hover:text-red-600 transition-colors"
+                className="inline-block text-sm font-semibold uppercase tracking-wider text-black underline underline-offset-4 decoration-red-500 hover:text-red-600 transition-colors cursor-pointer"
               >
-                → Scrivimi per un progetto
-              </a>
+                {copied ? '✓ Numero copiato negli appunti!' : '→ Scrivimi per un progetto'}
+              </button>
             </div>
           </div>
         </motion.div>
