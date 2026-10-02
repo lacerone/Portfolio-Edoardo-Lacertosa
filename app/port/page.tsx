@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface ExifData {
   camera?: string;
@@ -147,7 +147,6 @@ function StandardGalleryView({
       transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
       className="fixed inset-0 z-50 w-screen h-screen bg-white text-black overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white m-0 p-0"
     >
-      {/* FRECCIA MINIMAL IN GALLERIA */}
       <header className="fixed top-6 left-6 z-50 bg-transparent">
         <button
           onClick={onBack}
@@ -329,13 +328,21 @@ function InteractiveReelRow({
 }
 
 export default function Portfolio() {
+  const router = useRouter();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Gestione stato caricamento e animazione di uscita
+  const [isImagesLoaded, setIsImagesLoaded] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+
+  // Indice per lo slideshow delle foto di sfondo (Home style)
+  const [bgPointer, setBgPointer] = useState(0);
 
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
 
+  // 1. Fetch Foto e Gruppi + Pre-caricamento Immagini
   useEffect(() => {
     const fetchData = async () => {
       const [groupsRes, photosRes] = await Promise.all([
@@ -344,13 +351,46 @@ export default function Portfolio() {
       ]);
 
       if (groupsRes.data) setGroups(groupsRes.data as Group[]);
-      if (photosRes.data) setPhotos(photosRes.data as Photo[]);
+      
+      if (photosRes.data) {
+        const loadedPhotos = photosRes.data as Photo[];
+        setPhotos(loadedPhotos);
 
-      setLoading(false);
+        // Raccogli i link delle copertine dei reel da precaricare
+        const coverUrls = (groupsRes.data as Group[] || []).map((group) => {
+          const cover = loadedPhotos.find((p) => p.group_id === group.id && p.is_cover) ||
+                        loadedPhotos.find((p) => p.group_id === group.id);
+          return cover ? getOptimizedUrl(cover.public_url, 1000) : '';
+        }).filter(Boolean);
+
+        // Precaricamento assoluto in RAM
+        await Promise.all(
+          coverUrls.map((url) => {
+            return new Promise((resolve) => {
+              const img = new Image();
+              img.src = url;
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          })
+        );
+      }
+
+      // Attiva l'animazione di chiusura dei reel solo quando le immagini sono pronte
+      setIsImagesLoaded(true);
     };
 
     fetchData();
   }, []);
+
+  // 2. Alternarsi continuo delle foto di sfondo (Home style)
+  useEffect(() => {
+    if (photos.length === 0) return;
+    const interval = setInterval(() => {
+      setBgPointer((prev) => (prev + 1) % photos.length);
+    }, 250);
+    return () => clearInterval(interval);
+  }, [photos.length]);
 
   const shuffledGroupsRow1 = useMemo(() => shuffleArray(groups), [groups]);
   const shuffledGroupsRow2 = useMemo(() => shuffleArray(groups), [groups]);
@@ -359,6 +399,16 @@ export default function Portfolio() {
     if (!selectedGroup) return [];
     return photos.filter((p) => p.group_id === selectedGroup.id);
   }, [photos, selectedGroup]);
+
+  // Gestione del ritorno alla Home con riapertura dei reel
+  const handleBackToHome = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.push('/');
+    }, 850);
+  };
+
+  const bgPhotoUrl = photos[bgPointer] ? getOptimizedUrl(photos[bgPointer].public_url, 1000) : null;
 
   return (
     <main className="h-[100dvh] w-screen bg-white text-black m-0 p-0 font-sans select-none overflow-x-hidden relative">
@@ -394,49 +444,68 @@ export default function Portfolio() {
         }
       `}</style>
 
+      {/* SOTTOFONDO: Alternarsi delle foto dell'Home visibile finché i reel non arrivano al centro */}
+      {bgPhotoUrl && (
+        <div 
+          className="fixed inset-[0.5rem] flex items-center justify-center pointer-events-none z-0 bg-white"
+          style={{ height: 'calc(100dvh - 1rem)', width: 'calc(100vw - 1rem)' }}
+        >
+          <img
+            src={bgPhotoUrl}
+            alt="Home Slideshow Background"
+            className="h-full w-full object-contain block select-none transform scale-[0.78]"
+          />
+        </div>
+      )}
+
       {/* FRECCIA MINIMAL NELLA SCHERMATA PRINCIPALE (REEL) */}
       {!selectedGroup && (
         <div className="fixed top-6 left-6 z-50">
-          <Link
-            href="/"
+          <button
+            onClick={handleBackToHome}
             title="Torna alla Home"
-            className="p-2 flex items-center justify-center text-neutral-800 hover:text-black transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
+            className="p-2 flex items-center justify-center text-neutral-800 hover:text-black transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95 bg-white/80 backdrop-blur-sm rounded-full shadow-sm"
           >
             <ArrowLeft className="w-7 h-7 stroke-[1.5]" />
-          </Link>
+          </button>
         </div>
       )}
 
       <AnimatePresence mode="wait">
         {!selectedGroup && (
-          <motion.div
-            key="index-reels"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative bg-white m-0 p-0"
-          >
-            {/* RIGA SUPERIORE: 50% DVH ESATTO */}
-            <div className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0">
+          <div className="h-[100dvh] w-screen flex flex-col justify-between overflow-hidden relative z-10 m-0 p-0 pointer-events-auto">
+            
+            {/* RIGA SUPERIORE: Parte fuori dall'alto e scende coprendo la pagina */}
+            <motion.div
+              initial={{ y: '-100%' }}
+              animate={isExiting ? { y: '-100%' } : isImagesLoaded ? { y: '0%' } : { y: '-100%' }}
+              transition={{ duration: 0.95, ease: [0.16, 1, 0.3, 1] }}
+              className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0 bg-white"
+            >
               <InteractiveReelRow
                 groups={shuffledGroupsRow1}
                 photos={photos}
                 direction={1}
                 onSelectGroup={(g) => setSelectedGroup(g)}
               />
-            </div>
+            </motion.div>
 
-            {/* RIGA INFERIORE: 50% DVH ESATTO */}
-            <div className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0">
+            {/* RIGA INFERIORE: Parte fuori dal basso e sale coprendo la pagina */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={isExiting ? { y: '100%' } : isImagesLoaded ? { y: '0%' } : { y: '100%' }}
+              transition={{ duration: 0.95, ease: [0.16, 1, 0.3, 1] }}
+              className="h-[50dvh] flex-1 w-full overflow-hidden m-0 p-0 bg-white"
+            >
               <InteractiveReelRow
                 groups={shuffledGroupsRow2}
                 photos={photos}
                 direction={-1}
                 onSelectGroup={(g) => setSelectedGroup(g)}
               />
-            </div>
-          </motion.div>
+            </motion.div>
+
+          </div>
         )}
 
         {/* RENDERING CONDIZIONALE DEL PROGETTO SELEZIONATO */}
